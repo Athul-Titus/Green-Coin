@@ -53,9 +53,10 @@ export default function Onboarding() {
     commute: '', diet: '', energy: '',
     habits: [],
   })
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
+  const [email, setEmail] = useState('arjun@gmail.com')
+  const [password, setPassword] = useState('greencoin123')
+  const [name, setName] = useState('Arjun Sharma')
+  const [isLogin, setIsLogin] = useState(false)
   const [loading, setLoading] = useState(false)
   const [projected, setProjected] = useState<number | null>(null)
 
@@ -73,12 +74,21 @@ export default function Onboarding() {
   const handleFinish = async () => {
     setLoading(true)
     try {
-      const res = await authApi.register({
-        email, password, full_name: name,
-        user_type: 'individual', city: profile.city,
-      })
-      localStorage.setItem('gc_token', res.data.access_token)
-      localStorage.setItem('gc_user', JSON.stringify({ email, full_name: name, user_type: 'individual' }))
+      let res;
+      if (isLogin) {
+        res = await authApi.login(email, password);
+        localStorage.setItem('gc_token', res.data.access_token)
+        localStorage.setItem('gc_user', JSON.stringify({ email, full_name: name || 'User', user_type: 'individual' }))
+        navigate('/dashboard'); // Go straight to dashboard on login
+        return;
+      } else {
+        res = await authApi.register({
+          email, password, full_name: name,
+          user_type: 'individual', city: profile.city,
+        })
+        localStorage.setItem('gc_token', res.data.access_token)
+        localStorage.setItem('gc_user', JSON.stringify({ email, full_name: name, user_type: 'individual' }))
+      }
 
       // Get advisor plan to show projected earnings
       try {
@@ -88,7 +98,7 @@ export default function Onboarding() {
 
       setStep(7) // Show success
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Registration failed')
+      toast.error(e.response?.data?.detail || (isLogin ? 'Login failed' : 'Registration failed'))
     } finally {
       setLoading(false)
     }
@@ -269,20 +279,32 @@ export default function Onboarding() {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                     <div style={{ background: '#d8f3dc', borderRadius: '12px', padding: '10px' }}><Sprout color="#1a472a" size={24}/></div>
-                    <div><h2 style={{ fontFamily: 'Poppins,sans-serif', color: '#1a472a' }}>Create Account</h2>
-                    <p style={{ color: '#6c757d', fontSize: '0.9rem' }}>Start earning carbon credits today</p></div>
+                    <div><h2 style={{ fontFamily: 'Poppins,sans-serif', color: '#1a472a' }}>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
+                    <p style={{ color: '#6c757d', fontSize: '0.9rem' }}>{isLogin ? 'Log in to your account' : 'Start earning carbon credits today'}</p></div>
                   </div>
                   {[
-                    { label: 'Full Name', value: name, set: setName, placeholder: 'Arjun Sharma', type: 'text' },
+                    !isLogin && { label: 'Full Name', value: name, set: setName, placeholder: 'Arjun Sharma', type: 'text' },
                     { label: 'Email', value: email, set: setEmail, placeholder: 'arjun@gmail.com', type: 'email' },
                     { label: 'Password', value: password, set: setPassword, placeholder: '••••••••', type: 'password' },
-                  ].map(f => (
+                  ].filter(Boolean).map((f: any) => (
                     <div key={f.label} style={{ marginBottom: '16px' }}>
                       <label style={{ display: 'block', fontWeight: 600, color: '#1a472a', marginBottom: '6px' }}>{f.label}</label>
                       <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder} type={f.type}
-                        style={{ width: '100%', padding: '12px 16px', border: '2px solid #b7e4c7', borderRadius: '10px', fontSize: '1rem' }} />
+                        style={{ width: '100%', padding: '12px 16px', border: '2px solid #b7e4c7', borderRadius: '10px', fontSize: '1rem', color: '#1a472a' }} />
                     </div>
                   ))}
+                  <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                    <button style={{ background: 'none', border: 'none', color: '#2d6a4f', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
+                      onClick={() => setIsLogin(!isLogin)}>
+                      {isLogin ? 'Need an account? Sign Up' : 'Already have an account? Sign In'}
+                    </button>
+                    {isLogin && (
+                       <button style={{ display: 'block', margin: '8px auto 0', background: 'none', border: 'none', color: '#6c757d', fontSize: '0.8rem', textDecoration: 'underline', cursor: 'pointer' }}
+                         onClick={() => { setEmail('arjun.sharma@demo.greencoin.io'); setPassword('greencoin123'); }}>
+                         Use Demo Account
+                       </button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -326,8 +348,8 @@ export default function Onboarding() {
                 </button>
               ) : (
                 <button className="btn-primary" style={{ flex: 1 }}
-                  onClick={handleFinish} disabled={loading || !email || !password || !name}>
-                  {loading ? '⏳ Creating...' : '🌱 Create Account'}
+                  onClick={handleFinish} disabled={loading || !email || !password || (!name && !isLogin)}>
+                  {loading ? '⏳ Processing...' : isLogin ? '🔐 Sign In' : '🌱 Create Account'}
                 </button>
               )}
             </div>

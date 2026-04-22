@@ -1,45 +1,37 @@
 # ── Web Framework ─────────────────────────────
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-python-multipart==0.0.9
+fastapi
+uvicorn[standard]
+python-multipart
 
 # ── Database ──────────────────────────────────
-sqlalchemy==2.0.30
+sqlalchemy
 # psycopg2-binary==2.9.9
-alembic==1.13.1
+alembic
 
 # ── Redis ─────────────────────────────────────
-redis==5.0.4
+redis
 
 # ── Auth & Security ───────────────────────────
-passlib[bcrypt]==1.7.4
-python-jose[cryptography]==3.3.0
-bcrypt==4.1.3
+passlib[bcrypt]
+python-jose[cryptography]
+bcrypt
 
 # ── Data Validation ───────────────────────────
-pydantic==2.7.1
-pydantic-settings==2.2.1
-email-validator==2.1.1
+pydantic
+pydantic-settings
+email-validator
 
 # ── ML Stack ──────────────────────────────────
-scikit-learn
-xgboost
-torch
-numpy
-pandas
-shap
-joblib
 
 # ── Services ──────────────────────────────────
 # PDF generation
-reportlab==4.2.0
-qrcode[pil]==7.4.2
-Pillow==10.3.0
+reportlab
+qrcode[pil]
+Pillow
 
 # ── HTTP Client (for Google APIs) ─────────────
-httpx==0.27.0
+httpx
 
 # ── Utilities ─────────────────────────────────
-python-dotenv==1.0.1
-python-dateutil==2.9.0.post0
-haversine==2.8.1
+python-dotenv
+python-dateutil
