@@ -1,2 +1,6 @@
-def verify_trust_score(action_data):
-    return 85
+class TrustVerifier:
+    def verify_action(self, action_data):
+        return {
+            "trust_score": 85,
+            "flags": []
+        }

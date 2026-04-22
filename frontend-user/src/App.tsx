@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import LogAction from './pages/LogAction'
 import WalletPage from './pages/Wallet'
 import Advisor from './pages/Advisor'
+import Landing from './pages/Landing'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('gc_token')
@@ -105,7 +106,7 @@ export default function App() {
       }} />
       <Routes>
         <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/" element={<Navigate to="/dashboard" />} />
+        <Route path="/" element={<Landing />} />
         <Route path="/dashboard" element={<PrivateRoute><AppLayout><Dashboard /></AppLayout></PrivateRoute>} />
         <Route path="/log" element={<PrivateRoute><AppLayout><LogAction /></AppLayout></PrivateRoute>} />
         <Route path="/wallet" element={<PrivateRoute><AppLayout><WalletPage /></AppLayout></PrivateRoute>} />

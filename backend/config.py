@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     BACKEND_PORT: int = 8000
 
     # ── Database ─────────────────────────────────────
-    DATABASE_URL: str = "postgresql://greencoin:greencoin_secret@localhost:5432/greencoin"
+    DATABASE_URL: str = "sqlite:///./greencoin.db"
 
     # ── Redis ────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379/0"

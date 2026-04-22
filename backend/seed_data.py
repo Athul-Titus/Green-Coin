@@ -16,9 +16,10 @@ from database import SessionLocal, init_db, engine
 from models.user import User
 from models.action import GreenAction
 from models.credit import CarbonCredit, CreditBundle, BundlePurchase, ESGCertificate
-from passlib.context import CryptContext
+import hashlib
 
-pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def hash_pw(password: str):
+    return hashlib.sha256(password.encode()).hexdigest()
 
 ACTION_RATES = {
     "cycling_commute": 4, "public_transport": 2, "plant_based_meal": 5,
@@ -61,7 +62,7 @@ INDIVIDUAL_PROFILES = [
 
 
 def seed():
-    print("🌱 GreenCoin Seed Script Starting...")
+    print("GreenCoin Seed Script Starting...")
     init_db()
     db = SessionLocal()
 
@@ -77,7 +78,7 @@ def seed():
 
             user = User(
                 email=f"{p['full_name'].lower().replace(' ', '.')}@demo.greencoin.io",
-                password_hash=pwd.hash("greencoin123"),
+                password_hash=hash_pw("greencoin123"),
                 full_name=p["full_name"],
                 user_type="individual",
                 city=p["city"],
@@ -149,7 +150,7 @@ def seed():
             total_credits_per_user[str(user_id)] = user_total
 
         db.flush()
-        print(f"  ✓ Created ~500+ credit records")
+        print(f"  > Created ~500+ credit records")
 
         # ── Credit Bundles ────────────────────────────────
         print("Creating 3 credit bundles...")
@@ -207,7 +208,7 @@ def seed():
         if not corp1:
             corp1 = User(
                 email="sustainability@infosys.demo",
-                password_hash=pwd.hash("corporate123"),
+                password_hash=hash_pw("corporate123"),
                 full_name="Infosys ESG Team",
                 user_type="corporate",
                 company_name="Infosys Limited",
@@ -219,7 +220,7 @@ def seed():
         if not corp2:
             corp2 = User(
                 email="esg@tata.demo",
-                password_hash=pwd.hash("corporate123"),
+                password_hash=hash_pw("corporate123"),
                 full_name="Tata Group Sustainability",
                 user_type="corporate",
                 company_name="Tata Consultancy Services",
@@ -255,17 +256,17 @@ def seed():
         db.add(cert)
 
         db.commit()
-        print("\n✅ Seed complete!")
+        print("\n> Seed complete!")
         print(f"   Individual users: {len(individual_ids)}")
         print(f"   Credit bundles: 3 (1 sold, 2 available)")
         print(f"   Corporate accounts: 2")
-        print(f"\n🔑 Demo credentials:")
+        print(f"\n> Demo credentials:")
         print(f"   Individual: arjun.sharma@demo.greencoin.io / greencoin123")
         print(f"   Corporate:  sustainability@infosys.demo / corporate123")
 
     except Exception as e:
         db.rollback()
-        print(f"❌ Seed failed: {e}")
+        print(f"X Seed failed: {e}")
         raise
     finally:
         db.close()

@@ -1,2 +1,3 @@
-def detect_fraud(action_data):
-    return False, []
+class FraudDetector:
+    def detect_fraud(self, action_data):
+        return False, []
