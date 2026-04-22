@@ -1,7 +1,7 @@
 """GreenCoin — User SQLAlchemy Model"""
 import uuid
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, JSON, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -16,7 +16,7 @@ class UserType(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     user_type = Column(String(20), nullable=False, default="individual")

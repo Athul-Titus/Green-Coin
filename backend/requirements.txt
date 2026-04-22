@@ -5,7 +5,7 @@ python-multipart==0.0.9
 
 # ── Database ──────────────────────────────────
 sqlalchemy==2.0.30
-psycopg2-binary==2.9.9
+# psycopg2-binary==2.9.9
 alembic==1.13.1
 
 # ── Redis ─────────────────────────────────────
@@ -22,13 +22,13 @@ pydantic-settings==2.2.1
 email-validator==2.1.1
 
 # ── ML Stack ──────────────────────────────────
-scikit-learn==1.4.2
-xgboost==2.0.3
-torch==2.3.0
-numpy==1.26.4
-pandas==2.2.2
-shap==0.45.1
-joblib==1.4.2
+scikit-learn
+xgboost
+torch
+numpy
+pandas
+shap
+joblib
 
 # ── Services ──────────────────────────────────
 # PDF generation

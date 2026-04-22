@@ -1,7 +1,7 @@
 """GreenCoin — Credit & Bundle SQLAlchemy Models"""
 import uuid
 from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, ForeignKey, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -10,9 +10,9 @@ from database import Base
 class CarbonCredit(Base):
     __tablename__ = "carbon_credits"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    action_id = Column(UUID(as_uuid=True), ForeignKey("green_actions.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    action_id = Column(String(36), ForeignKey("green_actions.id"), nullable=False)
     amount = Column(Float, nullable=False)
     quality_score = Column(Integer, default=80)  # 0-100
     status = Column(String(20), default="available")  # available/reserved/sold
@@ -27,7 +27,7 @@ class CarbonCredit(Base):
 class CreditBundle(Base):
     __tablename__ = "credit_bundles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
     description = Column(Text)
     total_credits = Column(Float, nullable=False)
@@ -54,9 +54,9 @@ class CreditBundle(Base):
 class BundlePurchase(Base):
     __tablename__ = "bundle_purchases"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    bundle_id = Column(UUID(as_uuid=True), ForeignKey("credit_bundles.id"), nullable=False)
-    corporate_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    bundle_id = Column(String(36), ForeignKey("credit_bundles.id"), nullable=False)
+    corporate_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     credits_purchased = Column(Float, nullable=False)
     price_paid = Column(Float, nullable=False)
     invoice_number = Column(String(50), unique=True)
@@ -74,9 +74,9 @@ class BundlePurchase(Base):
 class ESGCertificate(Base):
     __tablename__ = "esg_certificates"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    purchase_id = Column(UUID(as_uuid=True), ForeignKey("bundle_purchases.id"), nullable=False)
-    corporate_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    purchase_id = Column(String(36), ForeignKey("bundle_purchases.id"), nullable=False)
+    corporate_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     certificate_number = Column(String(50), unique=True, nullable=False)
     tonnes_offset = Column(Float, nullable=False)
     action_breakdown = Column(JSON, default=dict)

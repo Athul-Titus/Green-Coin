@@ -1,0 +1,197 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700;800&display=swap');
+
+:root {
+  --green-dark: #1a472a;
+  --green-med: #2d6a4f;
+  --green-light: #52b788;
+  --green-pale: #b7e4c7;
+  --green-ghost: #d8f3dc;
+  --surface: #f8faf8;
+  --surface-dark: #0f2518;
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a5568;
+  --gold: #f6c90e;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--surface);
+  color: var(--text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* ── Dark Mode ── */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #0d1f14;
+    color: #e8f5e9;
+  }
+}
+
+/* ── Glass Card ── */
+.glass {
+  background: rgba(255,255,255,0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(26,71,42,0.08);
+}
+
+.glass-dark {
+  background: rgba(26,71,42,0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(82,183,136,0.25);
+  border-radius: var(--radius);
+  color: white;
+}
+
+/* ── Gradient Backgrounds ── */
+.bg-hero {
+  background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 50%, #40916c 100%);
+}
+
+.bg-card-green {
+  background: linear-gradient(135deg, #52b788 0%, #40916c 100%);
+}
+
+/* ── Buttons ── */
+.btn-primary {
+  background: linear-gradient(135deg, var(--green-med), var(--green-dark));
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(26,71,42,0.3);
+  letter-spacing: 0.01em;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(26,71,42,0.4);
+}
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--green-dark);
+  border: 2px solid var(--green-light);
+  border-radius: 12px;
+  padding: 10px 22px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-secondary:hover { background: var(--green-ghost); }
+
+/* ── Status Badges ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.badge-verified  { background: #d1fae5; color: #065f46; }
+.badge-pending   { background: #fef3c7; color: #92400e; }
+.badge-rejected  { background: #fee2e2; color: #991b1b; }
+
+/* ── Skeleton Loading ── */
+.skeleton {
+  background: linear-gradient(90deg, #e8f5e9 25%, #d8f3dc 50%, #e8f5e9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Credit Counter Animation ── */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.credit-counter { animation: countUp 0.5s ease-out; }
+
+/* ── Nav Sidebar ── */
+.sidebar {
+  width: 260px;
+  min-height: 100vh;
+  background: var(--green-dark);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+  position: fixed;
+  left: 0; top: 0;
+}
+.sidebar-logo {
+  padding: 0 24px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar-nav { padding: 16px 12px; flex: 1; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: rgba(255,255,255,0.7);
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+.nav-item:hover, .nav-item.active {
+  background: rgba(82,183,136,0.2);
+  color: #b7e4c7;
+}
+.nav-item.active { background: rgba(82,183,136,0.3); color: white; }
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: 260px;
+  padding: 32px;
+  min-height: 100vh;
+}
+
+/* ── Cards ── */
+.stat-card {
+  border-radius: var(--radius);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Mobile Sidebar toggle ── */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); transition: transform 0.3s; z-index: 100; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; padding: 16px; }
+}
+
+/* ── Recharts custom tooltip ── */
+.custom-tooltip {
+  background: white;
+  border: 1px solid var(--green-pale);
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
