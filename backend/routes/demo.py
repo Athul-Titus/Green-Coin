@@ -36,13 +36,13 @@ def run_demo(db: Session = Depends(get_db)):
     results = {}
 
     # ── Step 1: Create demo individual ───────────────────────────────────────
-    from passlib.context import CryptContext
-    pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    import hashlib
+    def hash_pw(p): return hashlib.sha256(p.encode()).hexdigest()
 
     demo_email = f"demo_{uuid.uuid4().hex[:6]}@greencoin.demo"
     individual = User(
         email=demo_email,
-        password_hash=pwd.hash("demo1234"),
+        password_hash=hash_pw("demo1234"),
         full_name="Arjun Sharma (Demo)",
         user_type="individual",
         city="Bangalore",
@@ -145,7 +145,7 @@ def run_demo(db: Session = Depends(get_db)):
     if not corporate:
         corporate = User(
             email=corp_email,
-            password_hash=pwd.hash("corp1234"),
+            password_hash=hash_pw("corp1234"),
             full_name="Infosys Sustainability Team",
             user_type="corporate",
             company_name="Infosys Limited",

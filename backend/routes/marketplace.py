@@ -84,7 +84,7 @@ def purchase_bundle(
         raise HTTPException(403, "Only corporate accounts can purchase bundles")
 
     bundle = db.query(CreditBundle).filter(
-        CreditBundle.id == uuid.UUID(bundle_id),
+        CreditBundle.id == bundle_id,
         CreditBundle.status == "available"
     ).first()
     if not bundle:
@@ -133,7 +133,7 @@ def download_certificate(
     current_user: User = Depends(get_current_user),
 ):
     cert = db.query(ESGCertificate).filter(
-        ESGCertificate.id == uuid.UUID(certificate_id)
+        ESGCertificate.id == certificate_id
     ).first()
     if not cert:
         raise HTTPException(404, "Certificate not found")

@@ -19,14 +19,16 @@ api.interceptors.request.use(config => {
   return config
 })
 
-// ── Auto-logout on 401 ───────────────────────────────────
+// ── Auto-logout on 401 (skip auth endpoints) ─────────────
 api.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401) {
+    const url = err.config?.url || ''
+    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register')
+    if (err.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('gc_token')
       localStorage.removeItem('gc_user')
-      window.location.href = '/login'
+      window.location.href = '/onboarding'
     }
     return Promise.reject(err)
   }

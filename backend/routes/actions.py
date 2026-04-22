@@ -119,7 +119,7 @@ def _verify_and_mint(action_id: str):
 
     db = SessionLocal()
     try:
-        action = db.query(GreenAction).filter(GreenAction.id == uuid.UUID(action_id)).first()
+        action = db.query(GreenAction).filter(GreenAction.id == action_id).first()
         if not action:
             return
 
