@@ -48,7 +48,13 @@ export default function LogAction() {
     
     // Build the GreenActionSubmission payload for the new Verification Pipeline
     const userStr = localStorage.getItem('gc_user')
-    const userId = userStr ? JSON.parse(userStr).id : 'demo_user'
+    let userId = 'test_user_001'
+    if (userStr) {
+      try {
+        const parsed = JSON.parse(userStr)
+        if (parsed.id) userId = parsed.id
+      } catch (e) {}
+    }
     
     const submissionData = {
       action_id: crypto.randomUUID(),
@@ -86,7 +92,15 @@ export default function LogAction() {
       })
       
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Verification pipeline failed to respond')
+      let errorMsg = 'Verification pipeline failed to respond';
+      if (e.response?.data?.detail) {
+        if (typeof e.response.data.detail === 'string') {
+          errorMsg = e.response.data.detail;
+        } else if (Array.isArray(e.response.data.detail)) {
+          errorMsg = e.response.data.detail.map((err: any) => `${err.loc?.join('.')} ${err.msg}`).join(', ') || 'Validation Error';
+        }
+      }
+      toast.error(errorMsg)
       setStep('proof')
     }
   }
