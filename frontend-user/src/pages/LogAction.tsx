@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { actionsApi, type ActionType } from '../api/greencoin'
+import { actionsApi, verificationApi, type ActionType } from '../api/greencoin'
 import toast from 'react-hot-toast'
+import { VerificationStatus } from '../components/Verification/VerificationStatus'
+import { VideoSelfie } from '../components/Verification/VideoSelfie'
 
 const ACTION_ICONS: Record<string, string> = {
   cycling_commute: '🚴', public_transport: '🚌', plant_based_meal: '🥗',
@@ -18,9 +20,12 @@ export default function LogAction() {
   const [quantity, setQuantity] = useState<number>(1)
   const [proofData, setProofData] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  
+  // Verification states
+  const [step, setStep] = useState<'select' | 'proof' | 'verifying' | 'audit' | 'done'>('select')
+  const [verificationResult, setVerificationResult] = useState<any>(null)
+  const [activeAuditType, setActiveAuditType] = useState<string | null>(null)
   const [trustPreview, setTrustPreview] = useState<number | null>(null)
-  const [step, setStep] = useState<'select' | 'proof' | 'done'>('select')
 
   useEffect(() => { actionsApi.getTypes().then(r => setTypes(r.data)) }, [])
 
@@ -36,19 +41,74 @@ export default function LogAction() {
 
   const handleSubmit = async () => {
     if (!selected) return
-    setLoading(true)
+    setStep('verifying')
+    
+    // Simulate getting a device token from a native app or browser fingerprint
+    const dummyDeviceToken = localStorage.getItem('gc_device_token') || 'dummy_token'
+    
+    // Build the GreenActionSubmission payload for the new Verification Pipeline
+    const userStr = localStorage.getItem('gc_user')
+    const userId = userStr ? JSON.parse(userStr).id : 'demo_user'
+    
+    const submissionData = {
+      action_id: crypto.randomUUID(),
+      user_id: userId,
+      action_type: selected.code,
+      claimed_credits: Math.round(quantity * selected.credits_per_unit),
+      timestamp: new Date().toISOString(),
+      device_fingerprint: {
+        imei_hash: "browser_hash",
+        mac_hash: "browser_hash",
+        os_version: navigator.userAgent,
+        screen_resolution: `${window.innerWidth}x${window.innerHeight}`,
+        cpu_cores: navigator.hardwareConcurrency || 4,
+        installed_apps_hash: "web_app",
+        sim_hash: "none",
+        carrier: "wifi",
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      battery_start_pct: 85,
+      battery_end_pct: 82,
+      // Pass the demo proof data through
+      receipt_image_b64: proofData.demo_receipt ? "demo_base64_string" : null,
+      meter_reading: proofData.meter_reading ? parseFloat(proofData.meter_reading) : null
+    }
+
     try {
+      const res = await verificationApi.submitAction(submissionData, dummyDeviceToken)
+      setVerificationResult(res.data)
+      
+      // Also log it to the legacy API for dashboard history
       await actionsApi.log({
         action_type: selected.code,
         quantity,
         proof_data: proofData,
       })
-      setStep('done')
-      toast.success(`✅ ${selected.display_name} logged! Verification in progress.`, { duration: 4000 })
+      
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Failed to log action')
-    } finally {
-      setLoading(false)
+      toast.error(e.response?.data?.detail || 'Verification pipeline failed to respond')
+      setStep('proof')
+    }
+  }
+
+  const handleAuditSubmit = async (base64Media: string) => {
+    if (!verificationResult || !activeAuditType) return
+    try {
+      const userStr = localStorage.getItem('gc_user')
+      const userId = userStr ? JSON.parse(userStr).id : 'demo_user'
+      
+      await verificationApi.auditRespond({
+        audit_id: 'dummy_audit_id', // In a real app we'd get this from the backend
+        user_id: userId,
+        audit_type: activeAuditType,
+        video_b64: activeAuditType === 'VIDEO_SELFIE' ? base64Media : undefined,
+      })
+      
+      toast.success('Audit submitted successfully. Credits released!')
+      setStep('done')
+      setActiveAuditType(null)
+    } catch (e: any) {
+      toast.error('Failed to submit audit.')
     }
   }
 
@@ -135,11 +195,11 @@ export default function LogAction() {
   const estimatedCredits = selected ? quantity * selected.credits_per_unit * ((trustPreview || 80) / 100 + 0.5) : 0
 
   return (
-    <div>
+    <div className="max-w-2xl mx-auto">
       <h2 style={{ fontFamily: 'Poppins,sans-serif', color: '#1a472a', marginBottom: '8px', fontSize: '1.5rem' }}>
         ➕ Log a Green Action
       </h2>
-      <p style={{ color: '#6c757d', marginBottom: '24px' }}>Every action earns verified carbon credits.</p>
+      <p style={{ color: '#6c757d', marginBottom: '24px' }}>Every action passes through our 5-Layer Trust Pipeline.</p>
 
       <AnimatePresence mode="wait">
         {/* ── Step 1: Select Action ── */}
@@ -203,26 +263,51 @@ export default function LogAction() {
             <div style={{ display: 'flex', gap: '12px' }}>
               <button className="btn-secondary" onClick={() => setStep('select')}>← Back</button>
               <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmit} disabled={loading}>
-                {loading ? '⏳ Submitting...' : `🌱 Submit Action (+${estimatedCredits.toFixed(0)} credits)`}
+                {loading ? '⏳ Verifying...' : `🌱 Run ML Verification (+${estimatedCredits.toFixed(0)} credits)`}
               </button>
             </div>
           </motion.div>
         )}
 
-        {/* ── Step 3: Done ── */}
+        {/* ── Step 3: Verifying Status ── */}
+        {step === 'verifying' && (
+           <motion.div key="verifying" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+              <VerificationStatus 
+                actionId="new_action" 
+                result={verificationResult} 
+                onAuditStart={(type) => {
+                  setActiveAuditType(type);
+                  setStep('audit');
+                }}
+              />
+              
+              {verificationResult && !verificationResult.audit_required && (
+                <div className="mt-8 flex justify-center space-x-4">
+                  <button className="btn-secondary px-6 py-2" onClick={() => { setStep('select'); setSelected(null); setVerificationResult(null) }}>
+                    Log Another
+                  </button>
+                  <button className="btn-primary px-6 py-2" onClick={() => window.location.href = '/dashboard'}>
+                    View Dashboard
+                  </button>
+                </div>
+              )}
+           </motion.div>
+        )}
+
+        {/* ── Step 4: Done ── */}
         {step === 'done' && (
           <motion.div key="done" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
             className="glass" style={{ padding: '48px', textAlign: 'center' }}>
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
               style={{ fontSize: '4rem', marginBottom: '16px' }}>🌿</motion.div>
             <h3 style={{ fontFamily: 'Poppins,sans-serif', color: '#1a472a', fontSize: '1.5rem', marginBottom: '8px' }}>
-              Action Logged!
+              Action Verified & Logged!
             </h3>
             <p style={{ color: '#6c757d', marginBottom: '24px' }}>
-              Your <strong>{selected?.display_name}</strong> is being verified by our ML system. Credits will appear in your wallet once verified.
+              Your credits have been added to your wallet.
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button className="btn-secondary" onClick={() => { setStep('select'); setSelected(null); setQuantity(1); setProofData({}) }}>
+              <button className="btn-secondary" onClick={() => { setStep('select'); setSelected(null); setQuantity(1); setProofData({}); setVerificationResult(null) }}>
                 Log Another
               </button>
               <button className="btn-primary" onClick={() => window.location.href = '/dashboard'}>
@@ -232,6 +317,15 @@ export default function LogAction() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Audit Modals */}
+      {step === 'audit' && activeAuditType === 'VIDEO_SELFIE' && (
+        <VideoSelfie 
+          auditId="dummy" 
+          onClose={() => setStep('verifying')} 
+          onSubmit={handleAuditSubmit} 
+        />
+      )}
     </div>
   )
 }

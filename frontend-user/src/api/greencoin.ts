@@ -151,3 +151,11 @@ export const advisorApi = {
 export const demoApi = {
   run: () => api.post('/demo/run'),
 }
+
+// ── Verification ─────────────────────────────────────────
+export const verificationApi = {
+  submitAction: (data: any, deviceToken: string) => 
+    api.post('/verify/submit-action', data, { headers: { 'X-Device-Token': deviceToken } }),
+  auditRespond: (data: { audit_id: string; user_id: string; audit_type: string; video_b64?: string; document_b64?: string }) =>
+    api.post('/verify/audit/respond', data),
+}
