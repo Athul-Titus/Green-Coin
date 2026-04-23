@@ -10,10 +10,6 @@ const ACTION_ICONS: Record<string, string> = {
   solar_energy: '☀️', composting: '♻️', ev_charging: '⚡', led_switch: '💡', no_flight: '✈️',
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  transport: '#d8f3dc', diet: '#fff3cd', energy: '#fff9db', waste: '#e0f7fa',
-}
-
 export default function LogAction() {
   const [types, setTypes] = useState<ActionType[]>([])
   const [selected, setSelected] = useState<ActionType | null>(null)
@@ -219,13 +215,27 @@ export default function LogAction() {
   }
 
   const estimatedCredits = selected ? quantity * selected.credits_per_unit * ((trustPreview || 80) / 100 + 0.5) : 0
+  const glassPanel: React.CSSProperties = {
+    borderRadius: '22px',
+    border: '1px solid rgba(207,255,226,0.35)',
+    background: 'linear-gradient(130deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08))',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    boxShadow: '0 16px 40px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.28)',
+  }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h2 style={{ fontFamily: 'Poppins,sans-serif', color: '#1a472a', marginBottom: '8px', fontSize: '1.5rem' }}>
+    <div className="max-w-2xl mx-auto" style={{ position: 'relative' }}>
+      <motion.div
+        aria-hidden
+        animate={{ x: [0, 22, -16, 0], y: [0, -14, 10, 0], scale: [1, 1.04, 0.97, 1] }}
+        transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ position: 'absolute', top: '-20px', right: '-90px', width: '230px', height: '230px', borderRadius: '50%', background: 'radial-gradient(circle at 40% 40%, rgba(120,255,196,0.3), rgba(120,255,196,0.01) 72%)', filter: 'blur(14px)', zIndex: -1 }}
+      />
+      <h2 style={{ fontFamily: 'Poppins,sans-serif', color: '#e9fff3', marginBottom: '8px', fontSize: '1.5rem' }}>
         ➕ Log a Green Action
       </h2>
-      <p style={{ color: '#6c757d', marginBottom: '24px' }}>Every action passes through our 5-Layer Trust Pipeline.</p>
+      <p style={{ color: 'rgba(228,255,240,0.78)', marginBottom: '24px' }}>Every action passes through our 5-Layer Trust Pipeline.</p>
 
       <AnimatePresence mode="wait">
         {/* ── Step 1: Select Action ── */}
@@ -235,12 +245,12 @@ export default function LogAction() {
               {types.map(t => (
                 <motion.button key={t.code} whileHover={{ y: -4, scale: 1.03 }} whileTap={{ scale: 0.97 }}
                   onClick={() => { setSelected(t); setStep('proof') }}
-                  style={{ background: CATEGORY_COLORS[t.category] || '#f0faf4',
-                    border: '2px solid transparent', borderRadius: '14px', padding: '20px 12px',
+                  style={{ background: 'linear-gradient(130deg, rgba(133,255,202,0.3), rgba(96,245,255,0.2))',
+                    border: '1px solid rgba(210,255,228,0.35)', borderRadius: '14px', padding: '20px 12px',
                     cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' }}>
                   <div style={{ fontSize: '2.2rem', marginBottom: '8px' }}>{ACTION_ICONS[t.code] || '🌿'}</div>
-                  <div style={{ fontWeight: 700, color: '#1a472a', fontSize: '0.85rem', lineHeight: 1.3 }}>{t.display_name}</div>
-                  <div style={{ color: '#2d6a4f', fontSize: '0.8rem', marginTop: '6px', fontWeight: 600 }}>
+                  <div style={{ fontWeight: 700, color: '#f1fff7', fontSize: '0.85rem', lineHeight: 1.3 }}>{t.display_name}</div>
+                  <div style={{ color: '#d6ffeb', fontSize: '0.8rem', marginTop: '6px', fontWeight: 600 }}>
                     +{t.credits_per_unit} / {t.unit}
                   </div>
                 </motion.button>
@@ -252,12 +262,12 @@ export default function LogAction() {
         {/* ── Step 2: Proof Collection ── */}
         {step === 'proof' && selected && (
           <motion.div key="proof" initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -100 }}>
-            <div className="glass" style={{ padding: '24px', marginBottom: '20px' }}>
+            <div style={{ ...glassPanel, padding: '24px', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                 <span style={{ fontSize: '2.5rem' }}>{ACTION_ICONS[selected.code]}</span>
                 <div>
-                  <h3 style={{ fontFamily: 'Poppins,sans-serif', color: '#1a472a' }}>{selected.display_name}</h3>
-                  <p style={{ color: '#6c757d', fontSize: '0.85rem' }}>{selected.description}</p>
+                  <h3 style={{ fontFamily: 'Poppins,sans-serif', color: '#f3fff8' }}>{selected.display_name}</h3>
+                  <p style={{ color: 'rgba(229,255,240,0.72)', fontSize: '0.85rem' }}>{selected.description}</p>
                 </div>
               </div>
               {renderProofInput()}
@@ -265,23 +275,23 @@ export default function LogAction() {
 
             {/* Trust Score Preview */}
             {trustPreview !== null && (
-              <motion.div className="glass" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                style={{ padding: '16px 24px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                style={{ ...glassPanel, padding: '16px 24px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div>
-                  <p style={{ color: '#6c757d', fontSize: '0.85rem' }}>🤖 Trust Score Preview</p>
+                  <p style={{ color: 'rgba(229,255,240,0.72)', fontSize: '0.85rem' }}>🤖 Trust Score Preview</p>
                   <div style={{ fontFamily: 'Poppins,sans-serif', fontSize: '1.8rem', fontWeight: 700,
-                    color: trustPreview >= 80 ? '#15803d' : trustPreview >= 60 ? '#d97706' : '#dc2626' }}>
+                    color: trustPreview >= 80 ? '#8bffd4' : trustPreview >= 60 ? '#ffd28a' : '#ff9494' }}>
                     {trustPreview}/100
                   </div>
                 </div>
-                <div style={{ flex: 1, height: '8px', background: '#e8f5e9', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ flex: 1, height: '8px', background: 'rgba(229,255,240,0.2)', borderRadius: '4px', overflow: 'hidden' }}>
                   <motion.div animate={{ width: `${trustPreview}%` }} transition={{ duration: 0.5 }}
-                    style={{ height: '100%', background: trustPreview >= 80 ? '#15803d' : trustPreview >= 60 ? '#f59e0b' : '#ef4444',
+                    style={{ height: '100%', background: trustPreview >= 80 ? '#8bffd4' : trustPreview >= 60 ? '#ffd28a' : '#ff9494',
                       borderRadius: '4px' }} />
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: '#6c757d', fontSize: '0.8rem' }}>Est. credits</p>
-                  <p style={{ fontWeight: 700, color: '#2d6a4f', fontSize: '1.2rem' }}>+{estimatedCredits.toFixed(1)}</p>
+                  <p style={{ color: 'rgba(229,255,240,0.72)', fontSize: '0.8rem' }}>Est. credits</p>
+                  <p style={{ fontWeight: 700, color: '#cbffe4', fontSize: '1.2rem' }}>+{estimatedCredits.toFixed(1)}</p>
                 </div>
               </motion.div>
             )}
@@ -323,13 +333,13 @@ export default function LogAction() {
         {/* ── Step 4: Done ── */}
         {step === 'done' && (
           <motion.div key="done" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-            className="glass" style={{ padding: '48px', textAlign: 'center' }}>
+            style={{ ...glassPanel, padding: '48px', textAlign: 'center' }}>
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
               style={{ fontSize: '4rem', marginBottom: '16px' }}>🌿</motion.div>
-            <h3 style={{ fontFamily: 'Poppins,sans-serif', color: '#1a472a', fontSize: '1.5rem', marginBottom: '8px' }}>
+            <h3 style={{ fontFamily: 'Poppins,sans-serif', color: '#f3fff8', fontSize: '1.5rem', marginBottom: '8px' }}>
               Action Verified & Logged!
             </h3>
-            <p style={{ color: '#6c757d', marginBottom: '24px' }}>
+            <p style={{ color: 'rgba(229,255,240,0.72)', marginBottom: '24px' }}>
               Your credits have been added to your wallet.
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
