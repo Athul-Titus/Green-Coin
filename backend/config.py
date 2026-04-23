@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     # ── Auth ─────────────────────────────────────────
     JWT_SECRET: str = "dev_secret_please_change_in_production"
+    DEVICE_SECRET: str = "device_secret_for_jwt_tokens_dev_only"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 10080  # 7 days
 
@@ -35,6 +36,7 @@ class Settings(BaseSettings):
     CLAUDE_API_KEY: str = ""
     MAPBOX_TOKEN: str = ""
     GROQ_API_KEY: str = ""
+    OPENWEATHER_API_KEY: str = ""
 
     # ── Credit Economy ───────────────────────────────
     CREDIT_TO_INR: float = 50.0          # 1 credit = ₹50

@@ -23,6 +23,10 @@ email-validator
 
 # ── ML Stack ──────────────────────────────────
 groq
+PyJWT
+numpy
+httpx
+networkx
 
 # ── Services ──────────────────────────────────
 # PDF generation

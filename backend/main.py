@@ -65,6 +65,7 @@ from routes.credits import router as credits_router
 from routes.marketplace import router as marketplace_router
 from routes.advisor import router as advisor_router
 from routes.demo import router as demo_router
+from routes.verification import router as verification_router
 
 app.include_router(auth_router)
 app.include_router(actions_router)
@@ -72,6 +73,7 @@ app.include_router(credits_router)
 app.include_router(marketplace_router)
 app.include_router(advisor_router)
 app.include_router(demo_router)
+app.include_router(verification_router)
 
 
 # ── Health Check ─────────────────────────────────────────────────────────────
