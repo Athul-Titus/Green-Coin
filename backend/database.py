@@ -60,7 +60,7 @@ def get_redis() -> redis.Redis:
 
 def init_db():
     """Create all tables (idempotent). Called on app startup."""
-    from models import user, action, credit, corporate  # noqa: F401 — registers models
+    from models import user, action, credit, corporate, verification  # noqa: F401 — registers models
     Base.metadata.create_all(bind=engine)
     logger.info("✅ Database tables initialized")
 
