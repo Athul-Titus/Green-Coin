@@ -40,6 +40,21 @@ async def submit_action(
     if not device_token:
         raise HTTPException(status_code=401, detail="X-Device-Token header is required")
         
+    from models.action import GreenAction
+    # Ensure the action exists in the database to prevent foreign key constraint errors
+    existing_action = db.query(GreenAction).filter(GreenAction.id == action.action_id).first()
+    if not existing_action:
+        new_action = GreenAction(
+            id=action.action_id,
+            user_id=action.user_id,
+            action_type_code=action.action_type,
+            quantity=1.0,
+            verification_status="verifying",
+            credits_earned=0.0
+        )
+        db.add(new_action)
+        db.commit()
+        
     pipeline = VerificationPipeline(db)
     result = await pipeline.verify(action, device_token)
     

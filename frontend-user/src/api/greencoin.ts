@@ -9,7 +9,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || '/api'
 export const api = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 15000,
+  timeout: 30000, // Increased to 30s for heavy ML verification simulation
 })
 
 // ── Auth token injection ──────────────────────────────────
