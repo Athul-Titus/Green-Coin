@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     GOOGLE_VISION_API_KEY: str = ""
     CLAUDE_API_KEY: str = ""
     MAPBOX_TOKEN: str = ""
+    GROQ_API_KEY: str = ""
 
     # ── Credit Economy ───────────────────────────────
     CREDIT_TO_INR: float = 50.0          # 1 credit = ₹50
