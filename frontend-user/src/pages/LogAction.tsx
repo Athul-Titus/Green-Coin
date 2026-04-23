@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { actionsApi, verificationApi, type ActionType } from '../api/greencoin'
+import { actionsApi, verificationApi, type ActionType, api } from '../api/greencoin'
 import toast from 'react-hot-toast'
 import { VerificationStatus } from '../components/Verification/VerificationStatus'
 import { VideoSelfie } from '../components/Verification/VideoSelfie'
@@ -43,9 +43,6 @@ export default function LogAction() {
     if (!selected) return
     setStep('verifying')
     
-    // Simulate getting a device token from a native app or browser fingerprint
-    const dummyDeviceToken = localStorage.getItem('gc_device_token') || 'dummy_token'
-    
     // Build the GreenActionSubmission payload for the new Verification Pipeline
     const userStr = localStorage.getItem('gc_user')
     let userId = 'test_user_001'
@@ -55,6 +52,31 @@ export default function LogAction() {
         if (parsed.id) userId = parsed.id
       } catch (e) {}
     }
+
+    const deviceFp = {
+      imei_hash: "browser_hash",
+      mac_hash: "browser_hash",
+      os_version: navigator.userAgent,
+      screen_resolution: `${window.innerWidth}x${window.innerHeight}`,
+      cpu_cores: navigator.hardwareConcurrency || 4,
+      installed_apps_hash: "web_app",
+      sim_hash: "none",
+      carrier: "wifi",
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    }
+
+    // Auto-register device to get a real JWT token for testing the ML pipeline
+    let deviceToken = localStorage.getItem('gc_device_token')
+    if (!deviceToken || deviceToken === 'dummy_token') {
+      try {
+        const regRes = await api.post(`/verify/register-device?user_id=${userId}`, deviceFp)
+        deviceToken = regRes.data.device_token
+        localStorage.setItem('gc_device_token', deviceToken as string)
+      } catch (e) {
+        console.warn("Could not register mock device", e)
+        deviceToken = 'dummy_token'
+      }
+    }
     
     const submissionData = {
       action_id: crypto.randomUUID(),
@@ -62,17 +84,7 @@ export default function LogAction() {
       action_type: selected.code,
       claimed_credits: Math.round(quantity * selected.credits_per_unit),
       timestamp: new Date().toISOString(),
-      device_fingerprint: {
-        imei_hash: "browser_hash",
-        mac_hash: "browser_hash",
-        os_version: navigator.userAgent,
-        screen_resolution: `${window.innerWidth}x${window.innerHeight}`,
-        cpu_cores: navigator.hardwareConcurrency || 4,
-        installed_apps_hash: "web_app",
-        sim_hash: "none",
-        carrier: "wifi",
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      },
+      device_fingerprint: deviceFp,
       battery_start_pct: 85,
       battery_end_pct: 82,
       // Pass the demo proof data through
@@ -81,7 +93,7 @@ export default function LogAction() {
     }
 
     try {
-      const res = await verificationApi.submitAction(submissionData, dummyDeviceToken)
+      const res = await verificationApi.submitAction(submissionData, deviceToken as string)
       setVerificationResult(res.data)
       
       // Also log it to the legacy API for dashboard history
