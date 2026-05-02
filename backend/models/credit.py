@@ -11,12 +11,12 @@ class CarbonCredit(Base):
     __tablename__ = "carbon_credits"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     action_id = Column(String(36), ForeignKey("green_actions.id"), nullable=False)
     amount = Column(Float, nullable=False)
     quality_score = Column(Integer, default=80)  # 0-100
-    status = Column(String(20), default="available")  # available/reserved/sold
-    minted_at = Column(DateTime(timezone=True), server_default=func.now())
+    status = Column(String(20), default="available", index=True)  # available/reserved/sold
+    minted_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     sold_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
