@@ -24,6 +24,9 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     logger.info(f"🌱 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info(f"   Demo mode: {'ON ✓' if settings.DEMO_MODE else 'OFF'}")
+    # Security warning
+    if settings.JWT_SECRET == "dev_secret_please_change_in_production":
+        logger.warning("⚠️  JWT_SECRET is still the default! Set a strong secret in .env for production.")
     init_db()
     ping_redis()
     # Pre-warm ML models
@@ -50,8 +53,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 # ── Static files (certificates) ───────────────────────────────────────────────
