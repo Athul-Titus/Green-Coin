@@ -16,7 +16,7 @@ import Advisor    from './pages/Advisor'
 
 // ── Auth guard ─────────────────────────────────────────────────────────────
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('gc_token')
+  const token = localStorage.getItem('greencoin_token')
   return token ? <>{children}</> : <Navigate to="/onboarding" replace />
 }
 
