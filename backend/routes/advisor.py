@@ -1,97 +1,78 @@
-"""GreenCoin — Advisor Routes (plan, forecast, peers)"""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from pydantic import BaseModel
-from typing import Optional, List
-
 from database import get_db
-from models.user import User
+from models import User
 from routes.auth import get_current_user
-from ml.green_advisor import GreenAdvisor
-from ml.credit_forecaster import CreditForecaster
 
-router = APIRouter(prefix="/advisor", tags=["advisor"])
+router = APIRouter()
 
+# Action recommendations with credit projections
+RECOMMENDATIONS = {
+    "urban": [
+        {"action": "cycling",          "monthly_credits": 120,
+         "tip": "Cycle to work 3x/week"},
+        {"action": "plant_based_meal", "monthly_credits": 90,
+         "tip": "Switch 2 meals/day to plant-based"},
+        {"action": "public_transport", "monthly_credits": 60,
+         "tip": "Use metro instead of cab"},
+        {"action": "led_switch",       "monthly_credits": 20,
+         "tip": "Switch all bulbs to LED"},
+        {"action": "composting",       "monthly_credits": 30,
+         "tip": "Compost kitchen waste daily"},
+    ],
+    "suburban": [
+        {"action": "solar_energy",     "monthly_credits": 200,
+         "tip": "Install solar water heater"},
+        {"action": "ev_charging",      "monthly_credits": 160,
+         "tip": "Switch to EV for daily commute"},
+        {"action": "plant_based_meal", "monthly_credits": 90,
+         "tip": "Reduce meat to 3x/week"},
+        {"action": "composting",       "monthly_credits": 30,
+         "tip": "Compost kitchen and garden waste"},
+        {"action": "led_switch",       "monthly_credits": 20,
+         "tip": "LED lighting throughout home"},
+    ],
+    "default": [
+        {"action": "plant_based_meal", "monthly_credits": 90,
+         "tip": "Start with plant-based meals"},
+        {"action": "cycling",          "monthly_credits": 80,
+         "tip": "Cycle for short trips"},
+        {"action": "composting",       "monthly_credits": 30,
+         "tip": "Compost kitchen waste"},
+        {"action": "led_switch",       "monthly_credits": 20,
+         "tip": "Switch to LED bulbs"},
+        {"action": "public_transport", "monthly_credits": 60,
+         "tip": "Use public transport"},
+    ]
+}
 
 @router.get("/plan")
-def get_advisor_plan(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+async def get_plan(
+    current_user: User = Depends(get_current_user)
 ):
-    """Get personalized green action plan for the current user."""
-    advisor = GreenAdvisor()
-    profile = current_user.lifestyle_profile or {}
-    profile["city"] = current_user.city
-    profile["neighborhood_type"] = current_user.neighborhood_type
+    neighborhood = current_user.neighborhood_type or "default"
+    recs = RECOMMENDATIONS.get(neighborhood,
+                               RECOMMENDATIONS["default"])
 
-    plan = advisor.generate_plan(profile)
+    total_monthly = sum(r["monthly_credits"] for r in recs)
+
     return {
-        "user_id": str(current_user.id),
-        "cluster": plan["cluster"],
-        "recommendations": plan["recommendations"],
-        "projected_monthly_credits": plan["projected_monthly_credits"],
-        "green_score": current_user.green_score,
+        "user_id":          current_user.id,
+        "recommendations":  recs,
+        "projected_monthly_min": int(total_monthly * 0.7),
+        "projected_monthly_max": int(total_monthly * 1.2),
+        "user_segment":     neighborhood,
     }
 
-
 @router.get("/forecast")
-def get_forecast(
-    months: int = 3,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+async def get_forecast(
+    current_user: User = Depends(get_current_user)
 ):
-    """Get LSTM-based credit earnings forecast."""
-    forecaster = CreditForecaster()
-    # Get last 90 days of credit history
-    from models.credit import CarbonCredit
-    from datetime import datetime, timedelta
-    cutoff = datetime.utcnow() - timedelta(days=90)
-    credits = (
-        db.query(CarbonCredit)
-        .filter(
-            CarbonCredit.user_id == current_user.id,
-            CarbonCredit.minted_at >= cutoff,
-        )
-        .order_by(CarbonCredit.minted_at)
-        .all()
-    )
-    history = [{"date": c.minted_at.isoformat(), "amount": c.amount} for c in credits]
-    result = forecaster.forecast_earnings(str(current_user.id), history, months=months)
-    return result
-
-
-@router.get("/peers")
-def get_peer_comparison(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Get peer comparison data for users in same cluster."""
-    advisor = GreenAdvisor()
-    profile = current_user.lifestyle_profile or {}
-    cluster_info = advisor.get_cluster_stats(profile)
-
-    # Calculate user's own monthly average
-    from models.credit import CarbonCredit
-    from datetime import datetime, timedelta
-    from sqlalchemy import func
-    cutoff = datetime.utcnow() - timedelta(days=30)
-    user_monthly = (
-        db.query(func.sum(CarbonCredit.amount))
-        .filter(
-            CarbonCredit.user_id == current_user.id,
-            CarbonCredit.minted_at >= cutoff,
-        )
-        .scalar() or 0.0
-    )
-
+    # Simple forecast based on current balance
+    base = current_user.total_credits
     return {
-        "your_monthly_credits": round(user_monthly, 2),
-        "your_monthly_inr": round(user_monthly * 50, 2),
-        "peer_cluster": cluster_info["label"],
-        "peer_avg_monthly_credits": cluster_info["avg_monthly_credits"],
-        "peer_avg_monthly_inr": cluster_info["avg_monthly_inr"],
-        "top_earner_monthly_credits": cluster_info["top_earner_monthly_credits"],
-        "your_percentile": cluster_info.get("percentile", 50),
-        "message": f"Users like you in {cluster_info['label']} earn ₹{cluster_info['avg_monthly_inr']:,.0f}/month on average",
+        "month_1": int(base * 1.1),
+        "month_2": int(base * 1.2),
+        "month_3": int(base * 1.35),
+        "trend":   "increasing",
     }
