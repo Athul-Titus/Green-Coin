@@ -1,367 +1,207 @@
-import React, { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { actionsApi, verificationApi, type ActionType, api } from '../api/greencoin'
-import toast from 'react-hot-toast'
-import { VerificationStatus } from '../components/Verification/VerificationStatus'
-import { VideoSelfie } from '../components/Verification/VideoSelfie'
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
-const ACTION_ICONS: Record<string, string> = {
-  cycling_commute: '🚴', public_transport: '🚌', plant_based_meal: '🥗',
-  solar_energy: '☀️', composting: '♻️', ev_charging: '⚡', led_switch: '💡', no_flight: '✈️',
-}
+const LogAction: React.FC = () => {
+  const [stage, setStage] = useState<'select' | 'recording' | 'verifying' | 'done'>('select');
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
 
-export default function LogAction() {
-  const [types, setTypes] = useState<ActionType[]>([])
-  const [selected, setSelected] = useState<ActionType | null>(null)
-  const [quantity, setQuantity] = useState<number>(1)
-  const [proofData, setProofData] = useState<Record<string, any>>({})
-  const [loading, setLoading] = useState(false)
-  
-  // Verification states
-  const [step, setStep] = useState<'select' | 'proof' | 'verifying' | 'audit' | 'done'>('select')
-  const [verificationResult, setVerificationResult] = useState<any>(null)
-  const [activeAuditType, setActiveAuditType] = useState<string | null>(null)
-  const [trustPreview, setTrustPreview] = useState<number | null>(null)
+  const actions = [
+    { id: 'cycling', icon: 'directions_bike', label: 'Cycling', reward: '+2.5 GC / km' },
+    { id: 'plant-meal', icon: 'local_dining', label: 'Plant Meal', reward: '+15 GC / meal' },
+    { id: 'solar', icon: 'solar_power', label: 'Solar Energy', reward: '+0.5 GC / kWh' },
+    { id: 'transit', icon: 'directions_transit', label: 'Public Transit', reward: '+1.8 GC / km' },
+    { id: 'compost', icon: 'compost', label: 'Composting', reward: '+5 GC / kg' },
+    { id: 'ev', icon: 'ev_station', label: 'EV Charging', reward: '+12 GC / session' },
+  ];
 
-  useEffect(() => { actionsApi.getTypes().then(r => setTypes(r.data)) }, [])
+  const handleSelectAction = (id: string) => {
+    setSelectedAction(id);
+    setStage('recording');
+    setTimeout(() => window.scrollBy({ top: 400, behavior: 'smooth' }), 100);
+  };
 
-  // Simple live trust score simulation
-  useEffect(() => {
-    if (!selected || quantity <= 0) return setTrustPreview(null)
-    const base = 85
-    const feasible = quantity <= (selected.max_daily_claim / 2) ? 10 : -15
-    const score = Math.min(100, Math.max(30, base + feasible + Math.round(Math.random() * 5)))
-    const t = setTimeout(() => setTrustPreview(score), 300)
-    return () => clearTimeout(t)
-  }, [selected, quantity])
+  const handleFinish = () => {
+    setStage('verifying');
+    setTimeout(() => setStage('done'), 3000);
+  };
 
-  const handleSubmit = async () => {
-    if (!selected) return
-    setStep('verifying')
-    
-    // Build the GreenActionSubmission payload for the new Verification Pipeline
-    const userStr = localStorage.getItem('gc_user')
-    let userId = 'test_user_001'
-    if (userStr) {
-      try {
-        const parsed = JSON.parse(userStr)
-        if (parsed.id) userId = parsed.id
-      } catch (e) {}
-    }
-
-    const deviceFp = {
-      imei_hash: "browser_hash",
-      mac_hash: "browser_hash",
-      os_version: navigator.userAgent,
-      screen_resolution: `${window.innerWidth}x${window.innerHeight}`,
-      cpu_cores: navigator.hardwareConcurrency || 4,
-      installed_apps_hash: "web_app",
-      sim_hash: "none",
-      carrier: "wifi",
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-    }
-
-    // Auto-register device to get a real JWT token for testing the ML pipeline
-    let deviceToken = localStorage.getItem('gc_device_token')
-    if (!deviceToken || deviceToken === 'dummy_token') {
-      try {
-        const regRes = await api.post(`/verify/register-device?user_id=${userId}`, deviceFp)
-        deviceToken = regRes.data.device_token
-        localStorage.setItem('gc_device_token', deviceToken as string)
-      } catch (e) {
-        console.warn("Could not register mock device", e)
-        deviceToken = 'dummy_token'
-      }
-    }
-    
-    const submissionData = {
-      action_id: crypto.randomUUID(),
-      user_id: userId,
-      action_type: selected.code,
-      claimed_credits: Math.round(quantity * selected.credits_per_unit),
-      timestamp: new Date().toISOString(),
-      device_fingerprint: deviceFp,
-      battery_start_pct: 85,
-      battery_end_pct: 82,
-      // Pass the demo proof data through
-      receipt_image_b64: proofData.demo_receipt ? "demo_base64_string" : null,
-      meter_reading: proofData.meter_reading ? parseFloat(proofData.meter_reading) : null
-    }
-
-    try {
-      const res = await verificationApi.submitAction(submissionData, deviceToken as string)
-      setVerificationResult(res.data)
-      
-      // Also log it to the legacy API for dashboard history
-      await actionsApi.log({
-        action_type: selected.code,
-        quantity,
-        proof_data: proofData,
-      })
-      
-    } catch (e: any) {
-      let errorMsg = 'Verification pipeline failed to respond';
-      if (e.response?.data?.detail) {
-        if (typeof e.response.data.detail === 'string') {
-          errorMsg = e.response.data.detail;
-        } else if (Array.isArray(e.response.data.detail)) {
-          errorMsg = e.response.data.detail.map((err: any) => `${err.loc?.join('.')} ${err.msg}`).join(', ') || 'Validation Error';
-        }
-      }
-      toast.error(errorMsg)
-      setStep('proof')
-    }
-  }
-
-  const handleAuditSubmit = async (base64Media: string) => {
-    if (!verificationResult || !activeAuditType) return
-    try {
-      const userStr = localStorage.getItem('gc_user')
-      const userId = userStr ? JSON.parse(userStr).id : 'demo_user'
-      
-      await verificationApi.auditRespond({
-        audit_id: 'dummy_audit_id', // In a real app we'd get this from the backend
-        user_id: userId,
-        audit_type: activeAuditType,
-        video_b64: activeAuditType === 'VIDEO_SELFIE' ? base64Media : undefined,
-      })
-      
-      toast.success('Audit submitted successfully. Credits released!')
-      setStep('done')
-      setActiveAuditType(null)
-    } catch (e: any) {
-      toast.error('Failed to submit audit.')
-    }
-  }
-
-  const renderProofInput = () => {
-    if (!selected) return null
-    switch (selected.code) {
-      case 'cycling_commute':
-      case 'public_transport':
-        return (
-          <div>
-            <p style={{ color: '#6c757d', marginBottom: '16px', fontSize: '0.9rem' }}>
-              🗺️ In production, this uses live GPS tracking. For demo, enter the distance.
-            </p>
-            <label style={{ display: 'block', fontWeight: 600, color: '#1a472a', marginBottom: '6px' }}>
-              Distance (km)
-            </label>
-            <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min={0.1} step={0.1}
-              style={{ width: '100%', padding: '12px 16px', border: '2px solid #b7e4c7', borderRadius: '10px', fontSize: '1.1rem' }} />
-            <div style={{ marginTop: '12px', padding: '12px', background: '#f0faf4', borderRadius: '10px' }}>
-              <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>
-                📍 Mock GPS trace: Bangalore City Centre → Koramangala (4.2 km)
-              </div>
-            </div>
-          </div>
-        )
-      case 'plant_based_meal':
-        return (
-          <div>
-            <p style={{ color: '#6c757d', marginBottom: '16px', fontSize: '0.9rem' }}>
-              📸 In production, you'd upload a receipt for OCR verification. For demo:
-            </p>
-            <div style={{ border: '2px dashed #b7e4c7', borderRadius: '12px', padding: '32px', textAlign: 'center', cursor: 'pointer',
-              background: '#f0faf4' }} onClick={() => setProofData({ demo_receipt: true, items: ['Tofu Buddha Bowl', 'Dal'] })}>
-              {proofData.demo_receipt ? (
-                <div>✅ <strong>Demo receipt loaded:</strong> Tofu Buddha Bowl, Dal Tadka</div>
-              ) : (
-                <div>📷 Tap to upload receipt (demo: click to use sample)</div>
-              )}
-            </div>
-            <label style={{ display: 'block', fontWeight: 600, color: '#1a472a', marginBottom: '6px', marginTop: '16px' }}>
-              Number of plant-based meals
-            </label>
-            <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min={1} max={5}
-              style={{ width: '100%', padding: '12px 16px', border: '2px solid #b7e4c7', borderRadius: '10px', fontSize: '1.1rem' }} />
-          </div>
-        )
-      case 'solar_energy':
-      case 'ev_charging':
-        return (
-          <div>
-            <label style={{ display: 'block', fontWeight: 600, color: '#1a472a', marginBottom: '6px' }}>
-              Energy (kWh)
-            </label>
-            <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min={0.1} step={0.1}
-              style={{ width: '100%', padding: '12px 16px', border: '2px solid #b7e4c7', borderRadius: '10px', fontSize: '1.1rem' }} />
-            <label style={{ display: 'block', fontWeight: 600, color: '#1a472a', marginBottom: '6px', marginTop: '16px' }}>
-              Meter reading or charger log (optional)
-            </label>
-            <input type="text" placeholder="e.g. 1234.5 kWh"
-              onChange={e => setProofData(p => ({ ...p, meter_reading: e.target.value }))}
-              style={{ width: '100%', padding: '12px 16px', border: '2px solid #b7e4c7', borderRadius: '10px', fontSize: '1rem' }} />
-          </div>
-        )
-      case 'composting':
-        return (
-          <div>
-            <label style={{ display: 'block', fontWeight: 600, color: '#1a472a', marginBottom: '6px' }}>Weight composted (kg)</label>
-            <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min={0.1} step={0.1}
-              style={{ width: '100%', padding: '12px 16px', border: '2px solid #b7e4c7', borderRadius: '10px', fontSize: '1.1rem' }} />
-          </div>
-        )
-      default:
-        return (
-          <div>
-            <p style={{ color: '#6c757d', marginBottom: '16px' }}>Confirm you completed: <strong>{selected.display_name}</strong></p>
-            <div style={{ padding: '12px', background: '#f0faf4', borderRadius: '10px', color: '#2d6a4f', fontWeight: 600 }}>
-              This is a one-time action worth <strong>{selected.credits_per_unit} credits</strong>.
-            </div>
-          </div>
-        )
-    }
-  }
-
-  const estimatedCredits = selected ? quantity * selected.credits_per_unit * ((trustPreview || 80) / 100 + 0.5) : 0
-  const glassPanel: React.CSSProperties = {
-    borderRadius: '22px',
-    border: '1px solid rgba(207,255,226,0.35)',
-    background: 'linear-gradient(130deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08))',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
-    boxShadow: '0 16px 40px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.28)',
-  }
+  const handleReset = () => {
+    setStage('select');
+    setSelectedAction(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
-    <div className="max-w-2xl mx-auto" style={{ position: 'relative' }}>
-      <motion.div
-        aria-hidden
-        animate={{ x: [0, 22, -16, 0], y: [0, -14, 10, 0], scale: [1, 1.04, 0.97, 1] }}
-        transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ position: 'absolute', top: '-20px', right: '-90px', width: '230px', height: '230px', borderRadius: '50%', background: 'radial-gradient(circle at 40% 40%, rgba(120,255,196,0.3), rgba(120,255,196,0.01) 72%)', filter: 'blur(14px)', zIndex: -1 }}
-      />
-      <h2 style={{ fontFamily: 'Poppins,sans-serif', color: '#e9fff3', marginBottom: '8px', fontSize: '1.5rem' }}>
-        ➕ Log a Green Action
-      </h2>
-      <p style={{ color: 'rgba(228,255,240,0.78)', marginBottom: '24px' }}>Every action passes through our 5-Layer Trust Pipeline.</p>
+    <div className="gc-app">
+      <div className="gc-grid-bg" />
+      <div className="gc-glow-orb" style={{ top: '-10%', left: '-10%' }} />
+      <div className="gc-glow-orb" style={{ bottom: '20%', right: '-10%' }} />
 
-      <AnimatePresence mode="wait">
-        {/* ── Step 1: Select Action ── */}
-        {step === 'select' && (
-          <motion.div key="select" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: '12px' }}>
-              {types.map(t => (
-                <motion.button key={t.code} whileHover={{ y: -4, scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                  onClick={() => { setSelected(t); setStep('proof') }}
-                  style={{ background: 'linear-gradient(130deg, rgba(133,255,202,0.3), rgba(96,245,255,0.2))',
-                    border: '1px solid rgba(210,255,228,0.35)', borderRadius: '14px', padding: '20px 12px',
-                    cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' }}>
-                  <div style={{ fontSize: '2.2rem', marginBottom: '8px' }}>{ACTION_ICONS[t.code] || '🌿'}</div>
-                  <div style={{ fontWeight: 700, color: '#f1fff7', fontSize: '0.85rem', lineHeight: 1.3 }}>{t.display_name}</div>
-                  <div style={{ color: '#d6ffeb', fontSize: '0.8rem', marginTop: '6px', fontWeight: 600 }}>
-                    +{t.credits_per_unit} / {t.unit}
+      {/* ── Nav ── */}
+      <header className="gc-nav">
+        <div className="gc-nav-inner">
+          <div className="gc-brand">
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>eco</span>
+            GreenCoin
+          </div>
+          <nav className="gc-nav-links">
+            <Link className="gc-nav-link" to="/dashboard">Dashboard</Link>
+            <a className="gc-nav-link gc-nav-link--active" href="#">Log Action</a>
+            <Link className="gc-nav-link" to="/wallet">Wallet</Link>
+            <Link className="gc-nav-link" to="/advisor">Advisor</Link>
+            <a className="gc-nav-link" href="#">Corporate</a>
+          </nav>
+          <div className="gc-nav-trail">
+            <div className="gc-trust-badge">Trust Score: 98</div>
+            <div className="gc-avatar">
+              <img
+                alt="User"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWyp9lcDjGO4g5aWJ33AV_ragd0xZE4Tsy5DAYocNpETTZS257bPiw05Cmr-8NyhHmjsR26wz8ssToa5lZbXKqkOQrKIenHIwFL5aba_ZbV367RHZLuN-xVHeaZxyGtETiJ5beRo5dOjN-wR32yk_MtFsYR1NBJEXVAzWibMCVhZ0nMU5heQPe8ad4Zk4inYBQK6P8igvrEzNjO70If1LihOBmUhwiLXvKq2IUsLhfSnJRZLx9fQEkno2SrtqJyCLKFYa1ZEo5Ck9X"
+              />
+              <div className="gc-avatar-dot" />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="gc-main">
+        {/* ── Header ── */}
+        <header style={{ textAlign: 'center', marginBottom: 64, maxWidth: 700, margin: '0 auto 64px' }}>
+          <h1 className="gc-h1">Log a Green Action</h1>
+          <p className="gc-body-lg gc-text-variant" style={{ marginTop: 16 }}>Every action verified. Every credit real.</p>
+        </header>
+
+        <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 48 }}>
+          {/* ── Step 1: Select Action ── */}
+          <section>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 className="gc-h3">1. Select Action Type</h2>
+              <span style={{ fontFamily: 'Space Grotesk', fontSize: 12, color: 'var(--gc-primary)', textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(98,223,125,0.1)', padding: '4px 12px', borderRadius: 999, border: '1px solid rgba(98,223,125,0.3)' }}>Select One</span>
+            </div>
+            <div className="gc-action-grid">
+              {actions.map((action) => (
+                <div
+                  key={action.id}
+                  className={`gc-action-card${selectedAction === action.id ? ' gc-action-card--active' : ''}`}
+                  onClick={() => handleSelectAction(action.id)}
+                >
+                  <div className="gc-action-card-icon">
+                    <span className="material-symbols-outlined" style={{ fontSize: 36, fontVariationSettings: "'FILL' 1" }}>{action.icon}</span>
                   </div>
-                </motion.button>
+                  <div>
+                    <h3 style={{ color: 'var(--gc-on-surface)', fontFamily: 'Space Grotesk', fontSize: 18, fontWeight: 600 }}>{action.label}</h3>
+                    <p className="gc-text-primary" style={{ fontFamily: 'Space Grotesk', fontSize: 14, marginTop: 4 }}>{action.reward}</p>
+                  </div>
+                </div>
               ))}
             </div>
-          </motion.div>
-        )}
+          </section>
 
-        {/* ── Step 2: Proof Collection ── */}
-        {step === 'proof' && selected && (
-          <motion.div key="proof" initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -100 }}>
-            <div style={{ ...glassPanel, padding: '24px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                <span style={{ fontSize: '2.5rem' }}>{ACTION_ICONS[selected.code]}</span>
-                <div>
-                  <h3 style={{ fontFamily: 'Poppins,sans-serif', color: '#f3fff8' }}>{selected.display_name}</h3>
-                  <p style={{ color: 'rgba(229,255,240,0.72)', fontSize: '0.85rem' }}>{selected.description}</p>
-                </div>
-              </div>
-              {renderProofInput()}
-            </div>
-
-            {/* Trust Score Preview */}
-            {trustPreview !== null && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                style={{ ...glassPanel, padding: '16px 24px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div>
-                  <p style={{ color: 'rgba(229,255,240,0.72)', fontSize: '0.85rem' }}>🤖 Trust Score Preview</p>
-                  <div style={{ fontFamily: 'Poppins,sans-serif', fontSize: '1.8rem', fontWeight: 700,
-                    color: trustPreview >= 80 ? '#8bffd4' : trustPreview >= 60 ? '#ffd28a' : '#ff9494' }}>
-                    {trustPreview}/100
+          {/* ── Step 2: Recording ── */}
+          {(stage === 'recording' || stage === 'verifying') && (
+            <section>
+              {stage === 'recording' && (
+                <div className="gc-card" style={{ overflow: 'hidden', padding: 0, border: '1px solid rgba(98,223,125,0.5)', boxShadow: '0 0 30px rgba(98,223,125,0.1)' }}>
+                  <div style={{ background: 'var(--gc-surface-container-highest)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(62,74,61,0.5)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div className="gc-status-pulse" />
+                      <span style={{ color: 'var(--gc-on-surface)', fontWeight: 600 }}>Recording Route...</span>
+                    </div>
+                    <span style={{ fontFamily: 'Space Grotesk', fontSize: 14, color: 'var(--gc-on-surface-variant)' }}>GPS Accuracy: <span className="gc-text-primary">High (3m)</span></span>
+                  </div>
+                  <div style={{ position: 'relative', height: 256, background: 'var(--gc-surface-container-lowest)', overflow: 'hidden' }}>
+                    <img
+                      alt="Route map"
+                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQ65_jZ0Dm4TqzruYL0CGECgbyJ7WbMlNIW74RdErhzu8xpKWFRG90PuUR1g86XV6ZY9gNI-1_n9ICqQ3MwtjBkM7jb3VAb4e392ML_yotQZbDgiDkggFmnkyHCypXg9D_p9MVmwoI3tSl1bkDBgcw-lbP7jJDnFGZM73IZeBB6R0r4xqtKk1Dqi9rYuLwH-L82Sv4Z5dq5dEo1ygocdqVAfh_iFbFZVQ3tYJAHKy75E2xuxefYyUyNHp36zKzki9Z3JHAOAoaUdZ0"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }}
+                    />
+                    <div style={{ position: 'absolute', bottom: 16, left: 16, right: 16, display: 'flex', gap: 16 }}>
+                      {[
+                        { label: 'Distance', value: '12.4 km', color: 'var(--gc-on-surface)' },
+                        { label: 'Est. Credits', value: '~31.0 GC', color: 'var(--gc-primary)', highlight: true },
+                        { label: 'Speed', value: '22 km/h', color: 'var(--gc-on-surface)' },
+                      ].map((s) => (
+                        <div key={s.label} className="gc-card" style={{ flex: 1, padding: '12px', textAlign: 'center' }}>
+                          <div style={{ fontFamily: 'Space Grotesk', fontSize: 11, color: s.highlight ? 'var(--gc-primary)' : 'var(--gc-on-surface-variant)', textTransform: 'uppercase' }}>{s.label}</div>
+                          <div style={{ fontFamily: 'Space Grotesk', fontSize: 20, color: s.color, fontWeight: 700, marginTop: 4 }}>{s.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ padding: 24, background: 'var(--gc-surface-container)' }}>
+                    <button className="gc-btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '16px' }} onClick={handleFinish}>
+                      <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>stop_circle</span>
+                      Complete &amp; Verify Session
+                    </button>
                   </div>
                 </div>
-                <div style={{ flex: 1, height: '8px', background: 'rgba(229,255,240,0.2)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <motion.div animate={{ width: `${trustPreview}%` }} transition={{ duration: 0.5 }}
-                    style={{ height: '100%', background: trustPreview >= 80 ? '#8bffd4' : trustPreview >= 60 ? '#ffd28a' : '#ff9494',
-                      borderRadius: '4px' }} />
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: 'rgba(229,255,240,0.72)', fontSize: '0.8rem' }}>Est. credits</p>
-                  <p style={{ fontWeight: 700, color: '#cbffe4', fontSize: '1.2rem' }}>+{estimatedCredits.toFixed(1)}</p>
-                </div>
-              </motion.div>
-            )}
+              )}
 
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button className="btn-secondary" onClick={() => setStep('select')}>← Back</button>
-              <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmit} disabled={loading}>
-                {loading ? '⏳ Verifying...' : `🌱 Run ML Verification (+${estimatedCredits.toFixed(0)} credits)`}
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── Step 3: Verifying Status ── */}
-        {step === 'verifying' && (
-           <motion.div key="verifying" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-              <VerificationStatus 
-                actionId="new_action" 
-                result={verificationResult} 
-                onAuditStart={(type) => {
-                  setActiveAuditType(type);
-                  setStep('audit');
-                }}
-              />
-              
-              {verificationResult && !verificationResult.audit_required && (
-                <div className="mt-8 flex justify-center space-x-4">
-                  <button className="btn-secondary px-6 py-2" onClick={() => { setStep('select'); setSelected(null); setVerificationResult(null) }}>
-                    Log Another
-                  </button>
-                  <button className="btn-primary px-6 py-2" onClick={() => window.location.href = '/dashboard'}>
-                    View Dashboard
-                  </button>
+              {stage === 'verifying' && (
+                <div className="gc-card" style={{ border: '1px solid rgba(98,223,125,0.2)' }}>
+                  <h2 className="gc-h3" style={{ marginBottom: 32, display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span className="material-symbols-outlined gc-text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
+                    Verification Pipeline
+                  </h2>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                    {[
+                      { icon: 'smartphone', label: 'Device Telemetry Check', sub: 'Validating accelerometer and GPS hardware signatures.', done: true },
+                      { icon: 'fingerprint', label: 'Biometric Pacing', sub: 'Matching speed variance with human physical limits.', done: true },
+                      { icon: 'refresh', label: 'Signal Fusion', sub: 'Cross-referencing altitude data with local topological maps.', loading: true },
+                      { icon: 'hub', label: 'Graph Analysis', sub: 'Checking against known fraudulent route patterns.', pending: true },
+                      { icon: 'fact_check', label: 'Zero-Knowledge Audit', sub: 'Generating final cryptographic proof for minting.', pending: true },
+                    ].map((step) => (
+                      <div key={step.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 16, opacity: step.pending ? 0.5 : 1 }}>
+                        <div style={{ width: 48, height: 48, borderRadius: '50%', border: `1px solid ${step.done ? 'var(--gc-primary)' : 'var(--gc-outline)'}`, background: step.done ? 'rgba(98,223,125,0.2)' : 'var(--gc-surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: step.done ? 'var(--gc-primary)' : 'var(--gc-on-surface-variant)', flexShrink: 0 }}>
+                          <span className="material-symbols-outlined" style={{ animation: step.loading ? 'spin 1s linear infinite' : 'none' }}>{step.icon}</span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: 'var(--gc-on-surface)', fontWeight: 600 }}>{step.label}</div>
+                          <div style={{ color: 'var(--gc-on-surface-variant)', fontSize: 14, marginTop: 4 }}>{step.sub}</div>
+                        </div>
+                        {step.done && <span className="material-symbols-outlined gc-text-primary" style={{ marginTop: 8 }}>check_circle</span>}
+                        {step.loading && <span style={{ color: 'var(--gc-on-surface-variant)', fontFamily: 'Space Grotesk', fontSize: 14, marginTop: 8 }}>Processing...</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
-           </motion.div>
-        )}
+            </section>
+          )}
 
-        {/* ── Step 4: Done ── */}
-        {step === 'done' && (
-          <motion.div key="done" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-            style={{ ...glassPanel, padding: '48px', textAlign: 'center' }}>
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
-              style={{ fontSize: '4rem', marginBottom: '16px' }}>🌿</motion.div>
-            <h3 style={{ fontFamily: 'Poppins,sans-serif', color: '#f3fff8', fontSize: '1.5rem', marginBottom: '8px' }}>
-              Action Verified & Logged!
-            </h3>
-            <p style={{ color: 'rgba(229,255,240,0.72)', marginBottom: '24px' }}>
-              Your credits have been added to your wallet.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button className="btn-secondary" onClick={() => { setStep('select'); setSelected(null); setQuantity(1); setProofData({}); setVerificationResult(null) }}>
-                Log Another
-              </button>
-              <button className="btn-primary" onClick={() => window.location.href = '/dashboard'}>
-                View Dashboard
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          {/* ── Step 3: Done ── */}
+          {stage === 'done' && (
+            <section className="gc-card" style={{ textAlign: 'center', padding: 64, border: '1px solid rgba(98,223,125,0.5)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, rgba(98,223,125,0.15), transparent)', pointerEvents: 'none' }} />
+              <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'rgba(98,223,125,0.1)', border: '2px solid rgba(98,223,125,0.5)', boxShadow: '0 0 40px rgba(98,223,125,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                <span className="material-symbols-outlined gc-text-primary" style={{ fontSize: 48, fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+              </div>
+              <h2 className="gc-h2" style={{ marginBottom: 8 }}>31 Credits Minted! 🎉</h2>
+              <p className="gc-text-primary" style={{ fontFamily: 'Space Grotesk', marginBottom: 32 }}>Tx Hash: 0x8a9f...e4d2</p>
+              <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Link to="/wallet" className="gc-btn-outline">View in Wallet</Link>
+                <button className="gc-btn-primary" onClick={handleReset}>Log Another Action</button>
+              </div>
+            </section>
+          )}
+        </div>
+      </main>
 
-      {/* Audit Modals */}
-      {step === 'audit' && activeAuditType === 'VIDEO_SELFIE' && (
-        <VideoSelfie 
-          auditId="dummy" 
-          onClose={() => setStep('verifying')} 
-          onSubmit={handleAuditSubmit} 
-        />
-      )}
+      <footer className="gc-footer">
+        <div className="gc-footer-inner">
+          <div className="gc-brand">
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>eco</span>
+            GreenCoin
+          </div>
+          <div className="gc-footer-links">
+            <a href="#">Privacy Policy</a><a href="#">Terms of Service</a>
+            <a href="#">ESG Methodology</a><a href="#">Support</a>
+          </div>
+          <div style={{ color: 'var(--gc-on-surface-variant)', fontSize: 12, fontFamily: 'Space Grotesk' }}>© 2024 GreenCoin AI. All rights reserved.</div>
+        </div>
+      </footer>
     </div>
-  )
-}
+  );
+};
+
+export default LogAction;

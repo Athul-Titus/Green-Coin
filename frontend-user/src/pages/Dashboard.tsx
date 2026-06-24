@@ -1,230 +1,284 @@
-import React, { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
-import { creditsApi, actionsApi, advisorApi, type BalanceResponse, type GreenAction, type Recommendation } from '../api/greencoin'
-import { Bike, Leaf, Zap, TrendingUp, Wallet, Lightbulb, ArrowRight, CheckCircle, Clock, XCircle } from 'lucide-react'
+import React, { useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
-const ACTION_ICONS: Record<string, string> = {
-  cycling_commute: '🚴', public_transport: '🚌', plant_based_meal: '🥗',
-  solar_energy: '☀️', composting: '♻️', ev_charging: '⚡', led_switch: '💡', no_flight: '✈️',
-}
-
-function AnimatedCounter({ value, duration = 1500 }: { value: number; duration?: number }) {
-  const [display, setDisplay] = useState(0)
-  useEffect(() => {
-    let start = 0
-    const step = value / (duration / 16)
-    const timer = setInterval(() => {
-      start += step
-      if (start >= value) { setDisplay(value); clearInterval(timer) }
-      else setDisplay(Math.floor(start))
-    }, 16)
-    return () => clearInterval(timer)
-  }, [value])
-  return <span className="credit-counter">{display.toLocaleString()}</span>
-}
-
-function SkeletonCard() {
-  return <div className="skeleton" style={{ height: '120px', borderRadius: '16px' }} />
-}
-
-export default function Dashboard() {
-  const [balance, setBalance] = useState<BalanceResponse | null>(null)
-  const [history, setHistory] = useState<GreenAction[]>([])
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
-  const [chartData, setChartData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [bal, hist, plan] = await Promise.all([
-          creditsApi.getBalance(),
-          actionsApi.getHistory(0, 10),
-          advisorApi.getPlan(),
-        ])
-        setBalance(bal.data)
-        setHistory(hist.data)
-        setRecommendations(plan.data.recommendations.slice(0, 3))
-
-        // Build chart data from history
-        const grouped: Record<string, number> = {}
-        hist.data.forEach(a => {
-          const day = a.timestamp.slice(0, 10)
-          grouped[day] = (grouped[day] || 0) + a.credits_earned
-        })
-        const chart = Object.entries(grouped).slice(-14).map(([date, credits]) => ({
-          date: new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-          credits,
-        }))
-        setChartData(chart)
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchAll()
-  }, [])
-
-  const statusIcon = (s: string) => {
-    if (s === 'verified') return <CheckCircle size={14} color="#15803d"/>
-    if (s === 'rejected') return <XCircle size={14} color="#dc2626"/>
-    return <Clock size={14} color="#d97706"/>
-  }
-  const statusClass = (s: string) => s === 'verified' ? 'badge badge-verified' : s === 'rejected' ? 'badge badge-rejected' : 'badge badge-pending'
-  const glassPanel: React.CSSProperties = {
-    borderRadius: '22px',
-    border: '1px solid rgba(207,255,226,0.35)',
-    background: 'linear-gradient(130deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08))',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
-    boxShadow: '0 16px 40px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.28)',
-  }
+const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
 
   return (
-    <div style={{ padding: '0', position: 'relative' }}>
-      <motion.div
-        aria-hidden
-        animate={{ x: [0, 25, -18, 0], y: [0, -18, 14, 0], scale: [1, 1.06, 0.96, 1] }}
-        transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ position: 'fixed', top: '70px', right: '-120px', width: '330px', height: '330px', pointerEvents: 'none', borderRadius: '50%', background: 'radial-gradient(circle at 40% 40%, rgba(120,255,196,0.36), rgba(120,255,196,0.01) 72%)', filter: 'blur(16px)', zIndex: -1 }}
-      />
-      <motion.div
-        aria-hidden
-        animate={{ x: [0, -22, 12, 0], y: [0, 18, -15, 0], scale: [1, 0.95, 1.04, 1] }}
-        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ position: 'fixed', bottom: '-120px', left: '220px', width: '320px', height: '320px', pointerEvents: 'none', borderRadius: '50%', background: 'radial-gradient(circle at 60% 50%, rgba(95,235,255,0.3), rgba(95,235,255,0.01) 70%)', filter: 'blur(20px)', zIndex: -1 }}
-      />
+    <div className="gc-app">
+      {/* ── Global background ── */}
+      <div className="gc-grid-bg" />
 
-      {/* ── Hero Balance Card ── */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-        style={{ ...glassPanel, background: 'linear-gradient(135deg, rgba(92,255,181,0.24), rgba(98,244,255,0.18))', padding: '32px', color: 'white', marginBottom: '24px', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px',
-          background: 'rgba(82,183,136,0.2)', borderRadius: '50%' }} />
-        <div style={{ position: 'absolute', bottom: '-30px', left: '60%', width: '150px', height: '150px',
-          background: 'rgba(120,244,255,0.14)', borderRadius: '50%' }} />
-        <p style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '8px' }}>💚 Available Credits</p>
-        <div style={{ fontFamily: 'Poppins,sans-serif', fontSize: '3.5rem', fontWeight: 800, lineHeight: 1 }}>
-          {loading ? '—' : <AnimatedCounter value={Math.round(balance?.available_credits || 0)} />}
-        </div>
-        <p style={{ opacity: 0.7, marginTop: '4px' }}>
-          ≈ ₹{loading ? '—' : (balance?.inr_value || 0).toLocaleString('en-IN')}
-        </p>
-        <div style={{ display: 'flex', gap: '24px', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
-          <div><div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{balance?.total_credits.toFixed(0) || '—'}</div>
-            <div style={{ opacity: 0.6, fontSize: '0.8rem' }}>Total earned</div></div>
-          <div><div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{balance?.sold_credits.toFixed(0) || '0'}</div>
-            <div style={{ opacity: 0.6, fontSize: '0.8rem' }}>Credits sold</div></div>
-          <div><div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{balance?.tonnes_equivalent.toFixed(2) || '—'}</div>
-            <div style={{ opacity: 0.6, fontSize: '0.8rem' }}>Tonnes offset</div></div>
-        </div>
-      </motion.div>
-
-      {/* ── Quick Actions ── */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-        {[
-          { label: 'Log Action',   icon: '➕', to: '/log' },
-          { label: 'Wallet',       icon: '💳', to: '/wallet' },
-          { label: 'Get Advice',   icon: '🤖', to: '/advisor' },
-        ].map(q => (
-          <Link key={q.to} to={q.to} style={{ flex: 1, textDecoration: 'none' }}>
-            <motion.div whileHover={{ y: -3, scale: 1.02 }} whileTap={{ scale: 0.98 }}
-              style={{ ...glassPanel, borderRadius: '14px', padding: '16px 12px', textAlign: 'center', color: '#edfff6', background: 'linear-gradient(130deg, rgba(133,255,202,0.3), rgba(96,245,255,0.2))' }}>
-              <div style={{ fontSize: '1.5rem' }}>{q.icon}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, marginTop: '4px' }}>{q.label}</div>
-            </motion.div>
-          </Link>
-        ))}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-        {/* ── Earnings Chart ── */}
-        <div style={{ ...glassPanel, padding: '24px', gridColumn: '1/-1' }}>
-          <h3 style={{ fontFamily: 'Poppins,sans-serif', color: '#f4fff8', marginBottom: '16px' }}>📈 14-Day Credit Earnings</h3>
-          {loading ? <div className="skeleton" style={{ height: '180px' }} /> : (
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="creditGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#83ffd2" stopOpacity={0.48}/>
-                    <stop offset="95%" stopColor="#83ffd2" stopOpacity={0.02}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(228,255,240,0.22)" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'rgba(237,255,245,0.78)' }} />
-                <YAxis tick={{ fontSize: 11, fill: 'rgba(237,255,245,0.78)' }} />
-                <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid rgba(190,255,221,0.42)', background: 'rgba(11,44,31,0.9)', color: '#effff7', boxShadow: '0 4px 20px rgba(0,0,0,0.25)' }} />
-                <Area type="monotone" dataKey="credits" stroke="#8affd3" strokeWidth={2}
-                  fill="url(#creditGrad)" dot={{ fill: '#8affd3', r: 4 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* ── Recommended Actions ── */}
-        <div style={{ ...glassPanel, padding: '24px', gridColumn: '1/-1' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontFamily: 'Poppins,sans-serif', color: '#f4fff8' }}>🎯 Today's Recommendations</h3>
-            <Link to="/advisor" style={{ color: '#c6ffe2', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>See all →</Link>
+      {/* ── Top Nav ── */}
+      <header className="gc-nav">
+        <div className="gc-nav-inner">
+          <div className="gc-brand">
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>eco</span>
+            GreenCoin
           </div>
-          {loading ? (
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: '100px', flex: 1 }} />)}
+          <nav className="gc-nav-links">
+            <a className="gc-nav-link gc-nav-link--active" href="#">Dashboard</a>
+            <Link className="gc-nav-link" to="/log-action">Log Action</Link>
+            <Link className="gc-nav-link" to="/wallet">Wallet</Link>
+            <Link className="gc-nav-link" to="/advisor">Advisor</Link>
+            <a className="gc-nav-link" href="#">Corporate</a>
+          </nav>
+          <div className="gc-nav-trail">
+            <div className="gc-trust-badge">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>verified</span>
+              Trust Score: 98
             </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '12px' }}>
-              {recommendations.map((r, i) => (
-                <motion.div key={r.action_type} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }} whileHover={{ y: -3 }}
-                  style={{ background: 'linear-gradient(130deg, rgba(133,255,202,0.28), rgba(96,245,255,0.2))', borderRadius: '12px', padding: '16px', border: '1px solid rgba(210,255,228,0.35)' }}>
-                  <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>{ACTION_ICONS[r.action_type] || '🌿'}</div>
-                  <div style={{ fontWeight: 600, color: '#f4fff8', fontSize: '0.9rem' }}>
-                    {r.action_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                  </div>
-                  <div style={{ color: '#d8ffee', fontWeight: 700, fontSize: '0.85rem', marginTop: '4px' }}>
-                    +{r.projected_monthly_credits.toFixed(0)} credits/mo
-                  </div>
-                </motion.div>
-              ))}
+            <div className="gc-avatar">
+              <img
+                alt="User profile"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWT_sMgrtmfn6Ov7-B-gukA4_ZMyd7HbzdV516VPwnUOHV7UnnYFn79azOFt8BJ8qq5g_1rCUAR3azFNLHTJbAUxEZFGbvw3EimNmgBo7uCndb7i2zZyYSfITrD18gpO-tEoJN5duhHWFdFXsEwEaoh2rmsgi8xnri4c7nAGNi0oHTFlIfwp3s-ljYHH6mqvHgmuf359navkg9WzHHzE1vERVd0434Z-yWZFKrXClWIlDGcQNOl5uedDRGL4yc6S4dMC2mfb7S2DBt"
+              />
+              <div className="gc-avatar-dot" />
             </div>
-          )}
+          </div>
+        </div>
+      </header>
+
+      {/* ── Main Content ── */}
+      <main className="gc-main">
+        {/* Header Row */}
+        <div className="gc-page-header">
+          <div>
+            <h1 className="gc-h2">Command Center</h1>
+            <p className="gc-body-variant">Real-time ecological impact &amp; tokenomics tracking.</p>
+          </div>
+          <Link to="/log-action" className="gc-btn-primary">
+            <span className="material-symbols-outlined">add</span>
+            LOG NEW ACTION
+          </Link>
         </div>
 
-        {/* ── Recent Activity ── */}
-        <div style={{ ...glassPanel, padding: '24px', gridColumn: '1/-1' }}>
-          <h3 style={{ fontFamily: 'Poppins,sans-serif', color: '#f4fff8', marginBottom: '16px' }}>🕐 Recent Activity</h3>
-          {loading ? (
-            [1,2,3].map(i => <div key={i} className="skeleton" style={{ height: '56px', marginBottom: '8px' }} />)
-          ) : history.length === 0 ? (
-            <p style={{ color: 'rgba(229,255,240,0.78)', textAlign: 'center', padding: '24px' }}>No actions yet. <Link to="/log" style={{ color: '#c9ffe4' }}>Log your first action →</Link></p>
-          ) : (
-            <div>
-              {history.slice(0, 6).map(a => (
-                <motion.div key={a.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                  style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(226,255,238,0.18)' }}>
-                  <span style={{ fontSize: '1.5rem', marginRight: '12px' }}>{ACTION_ICONS[a.action_type] || '🌿'}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, color: '#f3fff8', fontSize: '0.9rem' }}>
-                      {a.action_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+        {/* ── Stat Cards ── */}
+        <div className="gc-grid-4">
+          {/* Total Credits */}
+          <div className="gc-card gc-card--relative">
+            <div className="gc-label-muted">Total Credits</div>
+            <div className="gc-stat-number gc-glow-text">2,847</div>
+            <div className="gc-stat-footer gc-text-primary">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>account_balance_wallet</span>
+              Available Balance
+            </div>
+          </div>
+          {/* Earned This Month */}
+          <div className="gc-card">
+            <div className="gc-label-muted">Earned This Month</div>
+            <div className="gc-stat-number gc-text-primary">
+              +340 <span style={{ fontSize: 24, color: 'var(--gc-tertiary)' }}>GCN</span>
+            </div>
+            <div className="gc-stat-footer" style={{ color: 'var(--gc-secondary)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>trending_up</span>
+              ↑ 23% vs last month
+            </div>
+          </div>
+          {/* CO2 Offset */}
+          <div className="gc-card gc-card--relative">
+            <div className="gc-label-muted">CO2 Offset</div>
+            <div className="gc-stat-number">1.2<span className="gc-label-muted" style={{ fontSize: 20 }}>t</span></div>
+            <div className="gc-stat-footer gc-text-muted">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>co2</span>
+              Verified metric tons
+            </div>
+          </div>
+          {/* Trust Score */}
+          <div className="gc-card">
+            <div className="gc-label-muted">Trust Score</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div className="gc-stat-number">87</div>
+              <div style={{ position: 'relative', width: 64, height: 64 }}>
+                <svg width="64" height="64" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
+                  <path className="gc-ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#313632" strokeDasharray="100, 100" strokeWidth="3" />
+                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#62df7d" strokeDasharray="87, 100" strokeLinecap="round" strokeWidth="3" />
+                </svg>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--gc-primary)', fontFamily: 'Space Grotesk' }}>High</div>
+              </div>
+            </div>
+            <div className="gc-stat-footer gc-text-muted">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>shield</span>
+              Institutional Grade
+            </div>
+          </div>
+        </div>
+
+        {/* ── Middle Row ── */}
+        <div className="gc-grid-12">
+          {/* Credit Genesis Chart */}
+          <div className="gc-card gc-col-5">
+            <div className="gc-card-header">
+              <h3 className="gc-h3">Credit Genesis</h3>
+              <div style={{ display: 'flex', gap: 8, fontSize: 12, fontFamily: 'Space Grotesk' }}>
+                <button className="gc-tab">1W</button>
+                <button className="gc-tab gc-tab--active">1M</button>
+                <button className="gc-tab">YTD</button>
+              </div>
+            </div>
+            <div className="gc-chart-area">
+              <svg width="100%" height="180" viewBox="0 0 400 200" preserveAspectRatio="none" overflow="visible">
+                <defs>
+                  <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#62df7d" stopOpacity="0.3" />
+                    <stop offset="100%" stopColor="#62df7d" stopOpacity="0" />
+                  </linearGradient>
+                  <filter id="glow">
+                    <feGaussianBlur result="coloredBlur" stdDeviation="4" />
+                    <feMerge>
+                      <feMergeNode in="coloredBlur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                <path d="M0,180 L0,140 C40,120 80,150 120,130 C160,110 200,80 240,90 C280,100 320,50 360,60 L400,40 L400,180 Z" fill="url(#chartGradient)" />
+                <path d="M0,140 C40,120 80,150 120,130 C160,110 200,80 240,90 C280,100 320,50 360,60 L400,40" fill="none" filter="url(#glow)" stroke="#62df7d" strokeWidth="3" />
+                <circle cx="120" cy="130" fill="#0A0F0C" r="4" stroke="#62df7d" strokeWidth="2" />
+                <circle cx="240" cy="90" fill="#0A0F0C" r="4" stroke="#62df7d" strokeWidth="2" />
+                <circle cx="400" cy="40" fill="#62df7d" filter="url(#glow)" r="4" />
+              </svg>
+              <div className="gc-chart-labels">
+                <span>W1</span><span>W2</span><span>W3</span><span>W4</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Suggested Actions */}
+          <div className="gc-card gc-col-4 gc-card--green">
+            <div className="gc-card-header">
+              <span className="material-symbols-outlined gc-text-primary">auto_awesome</span>
+              <h3 className="gc-h3">Suggested Actions</h3>
+            </div>
+            <div className="gc-action-list">
+              {[
+                { icon: 'pedal_bike', label: 'Cycle to work', sub: 'Zero emission commute', pts: '+40', color: 'var(--gc-primary)' },
+                { icon: 'restaurant', label: 'Plant-based lunch', sub: 'Low carbon meal', pts: '+15', color: 'var(--gc-tertiary)' },
+                { icon: 'compost', label: 'Compost waste', sub: 'Organic recycling', pts: '+10', color: 'var(--gc-secondary)' },
+              ].map((a) => (
+                <div key={a.icon} className="gc-action-item">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="gc-action-icon">
+                      <span className="material-symbols-outlined" style={{ color: a.color, fontSize: 20 }}>{a.icon}</span>
                     </div>
-                    <div style={{ color: 'rgba(229,255,240,0.68)', fontSize: '0.8rem' }}>
-                      {new Date(a.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    <div>
+                      <div style={{ color: 'var(--gc-on-surface)', fontSize: 16 }}>{a.label}</div>
+                      <div style={{ color: 'var(--gc-outline)', fontSize: 10, fontFamily: 'Space Grotesk' }}>{a.sub}</div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ color: '#b9ffdc', fontWeight: 700 }}>+{a.credits_earned.toFixed(1)}</div>
-                    <span className={statusClass(a.verification_status)} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      {statusIcon(a.verification_status)} {a.verification_status}
-                    </span>
-                  </div>
-                </motion.div>
+                  <div style={{ color: a.color, background: `${a.color}1a`, padding: '2px 8px', borderRadius: 4, fontFamily: 'Space Grotesk', fontSize: 14, fontWeight: 700 }}>{a.pts}</div>
+                </div>
               ))}
             </div>
-          )}
+            <button className="gc-btn-outline" style={{ marginTop: 16 }}>
+              VIEW ALL PROTOCOLS
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>
+            </button>
+          </div>
+
+          {/* Live Network Status */}
+          <div className="gc-card gc-col-3 gc-card--center gc-card--relative">
+            <div className="gc-glow-orb" />
+            <div className="gc-network-badge">
+              <div className="gc-pulse-dot" />
+              Consensus Active
+            </div>
+            <div className="gc-label-muted" style={{ textAlign: 'center', marginTop: 8, letterSpacing: '0.1em' }}>LIVE NETWORK STATUS</div>
+          </div>
         </div>
-      </div>
+
+        {/* ── Bottom Row ── */}
+        <div className="gc-grid-12">
+          {/* Ledger Activity */}
+          <div className="gc-card gc-col-7">
+            <div className="gc-card-header">
+              <h3 className="gc-h3">Ledger Activity</h3>
+              <button style={{ color: 'var(--gc-outline)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                <span className="material-symbols-outlined">filter_list</span>
+              </button>
+            </div>
+            <div className="gc-feed">
+              {[
+                { icon: 'directions_car', title: 'EV Charging Session', time: 'Today, 14:32', tx: 'Tx: 0x8f...3b9a', amount: '+12.5 GCN', badge: 'Verified', badgeClass: 'gc-badge--primary' },
+                { icon: 'solar_power', title: 'Solar Panel Generation', time: 'Today, 09:15', tx: 'Oracle: Node_74', amount: '+85.0 GCN', badge: 'Pending', badgeClass: 'gc-badge--muted' },
+                { icon: 'receipt_long', title: 'Flight Offset Purchase', time: 'Yesterday', tx: 'Ref: AX-9921', amount: '+120.0 GCN', badge: 'Audit', badgeClass: 'gc-badge--tertiary' },
+                { icon: 'recycling', title: 'Unverified Claim', time: 'Oct 12', tx: 'Validation Failed', amount: '+15.0 GCN', badge: 'Rejected', badgeClass: 'gc-badge--error', strike: true },
+              ].map((item) => (
+                <div key={item.title} className="gc-feed-item">
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flex: 1 }}>
+                    <div className="gc-feed-icon">
+                      <span className="material-symbols-outlined">{item.icon}</span>
+                    </div>
+                    <div>
+                      <div style={{ color: 'var(--gc-on-surface)', marginBottom: 4 }}>{item.title}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--gc-outline)', fontSize: 11, fontFamily: 'Space Grotesk' }}>
+                        <span>{item.time}</span><span>•</span><span>{item.tx}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                    <div style={{ fontFamily: 'Space Grotesk', color: item.strike ? 'var(--gc-outline)' : 'var(--gc-on-surface)', textDecoration: item.strike ? 'line-through' : 'none' }}>{item.amount}</div>
+                    <div className={`gc-badge ${item.badgeClass}`}>{item.badge}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Source Breakdown */}
+          <div className="gc-card gc-col-5">
+            <h3 className="gc-h3" style={{ marginBottom: 24 }}>Source Breakdown</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', width: 192, height: 192 }}>
+                <svg width="192" height="192" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle cx="50" cy="50" fill="none" r="40" stroke="#62df7d" strokeDasharray="113.1 251.2" strokeDashoffset="0" strokeWidth="15" />
+                  <circle cx="50" cy="50" fill="none" r="40" stroke="#4de082" strokeDasharray="75.4 251.2" strokeDashoffset="-113.1" strokeWidth="15" />
+                  <circle cx="50" cy="50" fill="none" r="40" stroke="#96d5a3" strokeDasharray="37.7 251.2" strokeDashoffset="-188.5" strokeWidth="15" />
+                  <circle cx="50" cy="50" fill="none" r="40" stroke="#313632" strokeDasharray="25.1 251.2" strokeDashoffset="-226.2" strokeWidth="15" />
+                </svg>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 10, color: 'var(--gc-outline)', fontFamily: 'Space Grotesk', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Source</span>
+                  <span className="material-symbols-outlined gc-text-primary" style={{ fontSize: 24, marginTop: 4 }}>directions_car</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {[
+                  { label: 'Transport', pct: '45%', color: '#62df7d' },
+                  { label: 'Energy', pct: '30%', color: '#4de082' },
+                  { label: 'Lifestyle', pct: '15%', color: '#96d5a3' },
+                  { label: 'Other', pct: '10%', color: '#313632' },
+                ].map((s) => (
+                  <div key={s.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 12, height: 12, borderRadius: 2, background: s.color }} />
+                      <span style={{ color: 'var(--gc-on-surface)', fontSize: 14 }}>{s.label}</span>
+                    </div>
+                    <span style={{ color: 'var(--gc-outline)', fontFamily: 'Space Grotesk', fontSize: 14 }}>{s.pct}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* ── Footer ── */}
+      <footer className="gc-footer">
+        <div className="gc-footer-inner">
+          <div className="gc-brand">
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>eco</span>
+            GreenCoin
+          </div>
+          <div className="gc-footer-links">
+            <a href="#">Privacy Policy</a>
+            <a href="#">Terms of Service</a>
+            <a href="#">ESG Methodology</a>
+            <a href="#">Support</a>
+          </div>
+          <div style={{ color: 'var(--gc-outline)', fontSize: 12, fontFamily: 'Space Grotesk' }}>© 2024 GreenCoin AI. All rights reserved.</div>
+        </div>
+      </footer>
     </div>
-  )
-}
+  );
+};
+
+export default Dashboard;
