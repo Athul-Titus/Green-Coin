@@ -15,9 +15,9 @@ from routes.marketplace import router as marketplace_router
 async def lifespan(app: FastAPI):
     # Create all tables on startup
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created")
+    print("Database tables created")
     yield
-    print("🔴 Shutting down")
+    print("Shutting down")
 
 app = FastAPI(
     title="GreenCoin API",
