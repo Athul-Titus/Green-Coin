@@ -1,128 +1,106 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { StatsCounter } from './StatsCounter';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+interface CounterState {
+  current: number;
+  target: number;
+  el: HTMLSpanElement;
+}
+
+function useCounterAnimation(targets: { selector: string; target: number }[]) {
+  useEffect(() => {
+    const speed = 200;
+    const counters: CounterState[] = [];
+
+    targets.forEach(({ selector, target }) => {
+      const el = document.querySelector<HTMLSpanElement>(selector);
+      if (el) counters.push({ current: 0, target, el });
+    });
+
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    counters.forEach((counter) => {
+      const inc = counter.target / speed;
+      const update = () => {
+        if (counter.current < counter.target) {
+          counter.current = Math.min(counter.current + inc, counter.target);
+          counter.el.textContent = Math.ceil(counter.current).toLocaleString();
+          const t = setTimeout(update, 15);
+          timeouts.push(t);
+        } else {
+          counter.el.textContent = counter.target.toLocaleString() + '+';
+        }
+      };
+      const t = setTimeout(update, 600);
+      timeouts.push(t);
+    });
+
+    return () => timeouts.forEach(clearTimeout);
+  }, []);
+}
 
 export default function HeroContent() {
   const navigate = useNavigate();
 
+  useCounterAnimation([
+    { selector: '#counter-credits', target: 48290 },
+    { selector: '#counter-tonnes', target: 1240 },
+    { selector: '#counter-users', target: 8730 },
+  ]);
+
   return (
-    <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10
-    }}>
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.8 }}
-        style={{
-            border: '1px solid rgba(74,222,128,0.3)',
-            background: 'rgba(74,222,128,0.08)',
-            borderRadius: '20px',
-            padding: '6px 16px',
-            fontSize: '11px',
-            color: '#86efac',
-            letterSpacing: '2px',
-            marginBottom: '24px'
-        }}
-      >
-        DEMOCRATIZING CARBON MARKETS
-      </motion.div>
+    <div className="hero-left">
+      {/* Badge */}
+      <div className="hero-badge glow-green">
+        <span className="dot-pulse" />
+        <span className="hero-badge-text">Democratizing Carbon Markets</span>
+      </div>
 
-      <motion.h1
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.4, duration: 0.8 }}
-        className="hero-title"
-      >
-        GreenCoin
-      </motion.h1>
+      {/* Headline */}
+      <h1 className="hero-headline">
+        <span className="hero-headline-line">Earn Green.</span>
+        <span className="hero-headline-line accent">Sell Carbon.</span>
+        <span className="hero-headline-line">Change Earth.</span>
+      </h1>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6, duration: 0.8 }}
-        style={{
-            fontSize: '18px',
-            color: 'rgba(168,245,200,0.7)',
-            textAlign: 'center',
-            lineHeight: 1.6,
-            marginBottom: '40px'
-        }}
-        className="hero-subtitle"
-      >
-        Earn carbon credits from your green lifestyle.<br/>
-        Sell them to corporations. Save the planet.
-      </motion.div>
+      {/* Sub-headline */}
+      <p className="hero-subheadline">
+        Log your green lifestyle choices. GreenCoin verifies and mints carbon credits.
+        Corporations buy them for ESG compliance.
+      </p>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8, duration: 0.8 }}
-        style={{
-            display: 'flex',
-            gap: '16px',
-            pointerEvents: 'all'
-        }}
-        className="hero-buttons"
-      >
-        <button 
+      {/* CTA Buttons */}
+      <div className="hero-cta-row">
+        <button
+          className="cta-primary"
           onClick={() => navigate('/onboarding')}
-          style={{
-            background: '#16a34a',
-            color: 'white',
-            borderRadius: '8px',
-            padding: '14px 28px',
-            border: 'none',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseOver={(e) => {
-              e.currentTarget.style.background = '#15803d';
-              e.currentTarget.style.transform = 'scale(1.02)';
-          }}
-          onMouseOut={(e) => {
-              e.currentTarget.style.background = '#16a34a';
-              e.currentTarget.style.transform = 'scale(1)';
-          }}
         >
           Start Earning Credits
+          <span className="material-symbols-outlined">arrow_forward</span>
         </button>
-        
-        <button 
-          onClick={() => alert("Redirecting to localhost:5174 Corporate Dashboard...")}
-          style={{
-            background: 'transparent',
-            color: '#86efac',
-            borderRadius: '8px',
-            padding: '14px 28px',
-            border: '1px solid rgba(74,222,128,0.4)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseOver={(e) => {
-              e.currentTarget.style.background = 'rgba(74,222,128,0.1)';
-          }}
-          onMouseOut={(e) => {
-              e.currentTarget.style.background = 'transparent';
-          }}
+        <button
+          className="cta-secondary"
+          onClick={() => alert('Redirecting to Corporate Dashboard...')}
         >
-          Corporate Login →
+          Corporate Login
         </button>
-      </motion.div>
+      </div>
 
-      <StatsCounter />
+      {/* Stats Row */}
+      <div className="hero-stats-row">
+        <div className="hero-stat">
+          <span id="counter-credits" className="hero-stat-value">0</span>
+          <span className="hero-stat-label">Credits Minted</span>
+        </div>
+        <div className="hero-stat">
+          <span id="counter-tonnes" className="hero-stat-value">0</span>
+          <span className="hero-stat-label">Tonnes Offset</span>
+        </div>
+        <div className="hero-stat">
+          <span id="counter-users" className="hero-stat-value">0</span>
+          <span className="hero-stat-label">Active Users</span>
+        </div>
+      </div>
     </div>
   );
 }
