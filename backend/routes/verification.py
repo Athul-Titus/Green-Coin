@@ -40,7 +40,6 @@ async def submit_action(
     if not device_token:
         raise HTTPException(status_code=401, detail="X-Device-Token header is required")
         
-    from models.action import GreenAction
     # Ensure the action exists in the database to prevent foreign key constraint errors
     existing_action = db.query(GreenAction).filter(GreenAction.id == action.action_id).first()
     if not existing_action:
@@ -58,14 +57,22 @@ async def submit_action(
     pipeline = VerificationPipeline(db)
     result = await pipeline.verify(action, device_token)
     
-    # In a full system, if approved, we'd add the credits to the user's wallet here.
+    # Update action status and mint credits if approved
+    action_db = db.query(GreenAction).filter(GreenAction.id == action.action_id).first()
     if result.status == "APPROVED" or result.status == "PARTIAL":
-        user = db.query(User).filter(User.id == action.user_id).first()
-        if user:
-            user.balance += result.credits_awarded
-            user.total_carbon_saved += (result.credits_awarded * 0.1)  # Rough conversion metric
-            db.commit()
-            
+        action_db.verification_status = "verified"
+        action_db.credits_earned = result.credits_awarded
+        
+        credit = CarbonCredit(
+            user_id=action.user_id,
+            action_id=action.action_id,
+            amount=result.credits_awarded
+        )
+        db.add(credit)
+    else:
+        action_db.verification_status = "rejected"
+    
+    db.commit()
     return result
 
 @router.post("/audit/respond")
