@@ -1,47 +1,42 @@
+from datetime import datetime, timedelta
+from typing import Optional, List
+from jose import jwt, JWTError
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from typing import Optional
 import os
+import hashlib
+import secrets
 
 from database import get_db
 from models import User
+from config import settings
 
 router = APIRouter()
 
-# ── Password hashing ──────────────────────────
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-# ── JWT settings ──────────────────────────────
-SECRET_KEY = os.getenv("SECRET_KEY", "greencoin-secret-key-change-in-production")
-ALGORITHM  = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-# ── Pydantic schemas ──────────────────────────
+SECRET_KEY = settings.JWT_SECRET
+ALGORITHM = settings.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.JWT_EXPIRE_MINUTES
 
 class RegisterRequest(BaseModel):
     full_name: str
-    email: str
+    email: EmailStr
     password: str
     user_type: Optional[str] = "individual"
-    # Onboarding data (optional at registration)
-    location:          Optional[str] = None
+    location: Optional[str] = None
     neighborhood_type: Optional[str] = None
-    commute_type:      Optional[str] = None
-    diet_type:         Optional[str] = None
-    has_solar:         Optional[bool] = False
-    has_led:           Optional[bool] = False
-    has_smart_meter:   Optional[bool] = False
-    has_ev_charger:    Optional[bool] = False
+    commute_type: Optional[str] = None
+    diet_type: Optional[str] = None
+    has_solar: Optional[bool] = False
+    has_led: Optional[bool] = False
+    has_smart_meter: Optional[bool] = False
+    has_ev_charger: Optional[bool] = False
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 class TokenResponse(BaseModel):
@@ -57,21 +52,42 @@ class UserResponse(BaseModel):
     full_name: str
     email: str
     user_type: str
+    location: Optional[str] = None
+    neighborhood_type: Optional[str] = None
+    commute_type: Optional[str] = None
+    diet_type: Optional[str] = None
+    has_solar: bool
+    has_led: bool
+    has_smart_meter: bool
+    has_ev_charger: bool
     trust_score: float
     total_credits: int
     available_credits: int
-    created_at: datetime
 
     class Config:
         from_attributes = True
 
-# ── Helper functions ──────────────────────────
+
+# ── Password hashing (native hashlib PBKDF2) ──
+PBKDF2_ITERATIONS = 100_000
+SALT_LENGTH = 32
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    salt = os.urandom(SALT_LENGTH)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PBKDF2_ITERATIONS)
+    return f"pbkdf2${salt.hex()}${dk.hex()}"
 
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+def verify_password(plain: str, stored_hash: str) -> bool:
+    try:
+        parts = stored_hash.split("$")
+        if len(parts) != 3:
+            return False
+        salt = bytes.fromhex(parts[1])
+        expected = parts[2]
+        dk = hashlib.pbkdf2_hmac("sha256", plain.encode(), salt, PBKDF2_ITERATIONS)
+        return secrets.compare_digest(dk.hex(), expected)
+    except Exception:
+        return False
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
