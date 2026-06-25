@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime
 from sqlalchemy.orm import Session
-from database import SessionLocal, init_db
+from database import SessionLocal
 from models import user, action, credit, corporate, verification  # load all mappers
 from verification.models import GreenActionSubmission, DeviceFingerprint, GPSTrace, GPSPoint, SensorData, BiometricSession
 from verification.layer1_device import DeviceFingerprinter
