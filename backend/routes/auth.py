@@ -217,3 +217,4 @@ async def get_me(
 async def logout():
     # JWT is stateless — client just deletes token
     return {"message": "Logged out successfully"}
+
